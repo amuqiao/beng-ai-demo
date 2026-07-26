@@ -1,4 +1,5 @@
 .env
+.vscode/
 .venv/
 .data/
 .pytest_cache/
