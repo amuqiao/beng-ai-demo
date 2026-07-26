@@ -37,7 +37,8 @@
   function defaultState() {
     return {
       scene: "event",
-      selectedPoint: "P-DE-V",
+      selectedPart: "coupling",
+      selectedPoint: "P-DE-H",
       evidence: "",
       expertConfirmed: false,
       ticketGenerated: false,
@@ -48,14 +49,19 @@
   }
 
   function normalizeState(candidate) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      candidate = {};
+    }
     var clean = defaultState();
     Object.keys(clean).forEach(function (key) {
       if (Object.prototype.hasOwnProperty.call(candidate, key)) clean[key] = candidate[key];
     });
     if (sceneOrder.indexOf(clean.scene) < 0) clean.scene = "event";
-    if (!DATA.measurementPoints.some(function (point) { return point.id === clean.selectedPoint; })) {
-      clean.selectedPoint = "P-DE-V";
+    if (!DATA.equipmentParts.some(function (part) { return part.id === clean.selectedPart; })) {
+      clean.selectedPart = "coupling";
     }
+    var currentPart = DATA.equipmentParts.find(function (part) { return part.id === clean.selectedPart; });
+    clean.selectedPoint = currentPart ? currentPart.pointId : "P-DE-H";
     clean.expertConfirmed = clean.expertConfirmed === true;
     clean.ticketGenerated = clean.ticketGenerated === true && clean.expertConfirmed;
     clean.feedbackConfirmed = clean.feedbackConfirmed === true && clean.ticketGenerated;
@@ -104,6 +110,10 @@
 
   function selectedPoint() {
     return DATA.measurementPoints.find(function (point) { return point.id === state.selectedPoint; }) || DATA.measurementPoints[0];
+  }
+
+  function selectedPart() {
+    return DATA.equipmentParts.find(function (part) { return part.id === state.selectedPart; }) || DATA.equipmentParts[0];
   }
 
   function sceneIndex(sceneKey) {
@@ -212,63 +222,155 @@
   }
 
   function renderEventScene() {
-    var point = selectedPoint();
     return pageShell(
-      "P-1 主事件入口",
-      "默认展开当前关注级事件，不做平台总览",
+      "P-1 泵机组部位级诊断大屏",
+      "长岭站 / 单设备多部位异常定位",
       h("button", { class: "primary-action", type: "button", dataset: { action: "go-diagnosis" }, text: "进入诊断证据" }),
-      h("div", { class: "event-grid" }, [
-        h("section", { class: "main-event panel" }, [
-          h("div", { class: "event-topline" }, [
-            h("span", { class: "badge risk", text: DATA.event.grade }),
-            h("span", { class: "mono", text: DATA.event.id }),
-          ]),
-          h("h3", { text: DATA.event.title }),
-          h("p", { class: "event-trigger", text: DATA.event.trigger }),
-          h("div", { class: "summary-grid" }, DATA.event.summary.map(function (item) {
-            return h("div", { class: "summary-item" }, [
-              h("span", { text: item.label }),
-              h("strong", { text: item.value }),
-            ]);
-          })),
-          h("div", { class: "source-row" }, [
-            sourcePill("runtime", DATA.event.runtimeSource),
-            sourcePill("basis", DATA.event.basisSource),
-          ]),
-        ]),
-        h("section", { class: "asset-panel panel" }, [
-          panelTitle("一泵一档", "CL-P1"),
-          renderAssetFacts(asset("CL-P1")),
-          h("div", { class: "asset-link" }, [
-            h("strong", { text: "三级体系映射" }),
-            h("p", { text: "诊断专家负责研判，区域监视中心推进处置，作业区完成现场反馈。" }),
-          ]),
-        ]),
-        h("section", { class: "point-panel panel" }, [
-          panelTitle("泵体测点示意", point.name),
-          renderPointMap(),
-        ]),
-        h("section", { class: "timeline-panel panel" }, [
-          panelTitle("事件时间线", "warning"),
-          renderTimeline([
-            ["15:42", "监测回放形成 P-1 关注事件"],
-            ["15:46", "测点 P-DE-V 进入演示预警线"],
-            ["15:51", "频谱和相位证据关联完成"],
-            ["待处理", "提交专家复核"],
-          ]),
-        ]),
-        h("section", { class: "capability-panel panel" }, [
-          panelTitle("申报能力映射", "why this case"),
-          h("div", { class: "capability-list" }, DATA.capabilityMap.map(function (item) {
-            return h("article", { class: "capability-item" }, [
-              h("strong", { text: item.capability }),
-              h("p", { text: item.proof }),
-              h("span", { text: item.demoPart + " / " + item.boundary }),
-            ]);
-          })),
-        ]),
+      h("div", { class: "ops-dashboard" }, [
+        renderPumpFleetPanel(),
+        renderUnitDiagnosticPanel(),
+        renderAiDecisionPanel(),
+        renderMetricCommandStrip(),
       ])
     );
+  }
+
+  function renderPumpFleetPanel() {
+    return h("section", { class: "pump-fleet panel" }, [
+      panelTitle("泵机组队列", "station assets"),
+      h("div", { class: "fleet-list" }, DATA.pumpFleet.map(function (pump) {
+        return h("button", {
+          class: "fleet-card " + statusClass(pump.status) + (pump.id === "P-1" ? " selected" : ""),
+          type: "button",
+        }, [
+          h("span", { class: "fleet-id", text: pump.id }),
+          h("strong", { text: pump.name }),
+          h("span", { class: "fleet-status", text: pump.status }),
+          h("div", { class: "fleet-kpis" }, [
+            h("span", { text: "负荷 " + pump.load }),
+            h("span", { text: "振动 " + pump.vibration }),
+            h("span", { text: "温度 " + pump.temperature }),
+          ]),
+        ]);
+      })),
+    ]);
+  }
+
+  function renderUnitDiagnosticPanel() {
+    var activePart = selectedPart();
+    return h("section", { class: "unit-diagnostic panel" }, [
+      h("div", { class: "unit-title" }, [
+        h("div", {}, [
+          h("span", { class: "badge risk", text: DATA.event.grade }),
+          h("h3", { text: "P-1 输油泵机组" }),
+          h("p", { text: "电机 - 联轴器 - 泵体 - 基础多部位关联诊断" }),
+        ]),
+        h("div", { class: "event-code" }, [
+          h("span", { text: "事件编号" }),
+          h("strong", { text: DATA.event.id }),
+        ]),
+      ]),
+      h("div", { class: "machine-board" }, [
+        h("div", { class: "machine-schematic", role: "img", "aria-label": "P-1 输油泵机组部位示意图" }, [
+          h("div", { class: "schematic-line shaft-line" }),
+          h("div", { class: "schematic-line base-line" }),
+          h("div", { class: "pipe-line inlet" }),
+          h("div", { class: "pipe-line outlet" }),
+          h("div", { class: "flow-arrow", text: "FLOW" }),
+        ].concat(DATA.equipmentParts.map(function (part) {
+          return h("button", {
+            class: "schematic-part part-" + part.id + " " + part.status + (activePart.id === part.id ? " selected" : ""),
+            type: "button",
+            "aria-pressed": activePart.id === part.id ? "true" : "false",
+            dataset: { part: part.id },
+            title: part.label + " / " + part.verdict,
+          }, [
+            h("span", { text: part.label }),
+            h("em", { text: part.metric }),
+          ]);
+        }))),
+      ]),
+      h("div", { class: "part-status-grid" }, DATA.equipmentParts.map(function (part) {
+        return h("button", {
+          class: "part-status " + part.status + (activePart.id === part.id ? " selected" : ""),
+          type: "button",
+          "aria-pressed": activePart.id === part.id ? "true" : "false",
+          dataset: { part: part.id },
+        }, [
+          h("span", { text: part.label }),
+          h("strong", { text: part.metric }),
+          h("em", { text: part.verdict }),
+        ]);
+      })),
+    ]);
+  }
+
+  function renderAiDecisionPanel() {
+    var part = selectedPart();
+    var point = DATA.measurementPoints.find(function (item) { return item.id === part.pointId; }) || selectedPoint();
+    return h("section", { class: "ai-decision panel" }, [
+      panelTitle("AI 诊断决策", "human in loop"),
+      h("div", { class: "decision-result" }, [
+        h("span", { class: "result-code", text: "MISALIGNMENT" }),
+        h("strong", { text: DATA.diagnosis.result }),
+        h("p", { text: DATA.event.trigger }),
+      ]),
+      h("div", { class: "selected-point-card" }, [
+        h("span", { text: "当前定位部位" }),
+        h("strong", { text: part.label + " / " + point.name }),
+        h("p", { text: part.verdict + "；" + part.metric + "。" }),
+      ]),
+      h("div", { class: "decision-evidence" }, [
+        evidenceLine("2X 频谱", "100.3 Hz / 幅值 0.91", "active"),
+        evidenceLine("相位差", "-81.06° / r=0.97", "active"),
+        evidenceLine("基础振动", "地脚区域同步偏大", "watch"),
+      ]),
+      h("div", { class: "decision-next" }, [
+        h("strong", { text: "建议动作" }),
+        h("p", { text: "提交专家复核；停机窗口内完成激光对中复核，并同步检查地脚螺栓和管道约束。" }),
+      ]),
+      h("div", { class: "source-row" }, [
+        sourcePill("runtime", DATA.event.runtimeSource),
+        sourcePill("basis", DATA.event.basisSource),
+      ]),
+    ]);
+  }
+
+  function renderMetricCommandStrip() {
+    return h("section", { class: "metric-command panel" }, [
+      h("div", { class: "metric-list" }, DATA.dashboardMetrics.map(function (metric) {
+        return h("article", { class: "metric-tile " + metric.status }, [
+          h("span", { text: metric.label }),
+          h("strong", {}, [
+            document.createTextNode(metric.value),
+            h("em", { text: metric.unit }),
+          ]),
+          h("small", { text: metric.delta }),
+        ]);
+      })),
+      h("div", { class: "event-timeline-compact" }, [
+        h("strong", { text: "事件链" }),
+        renderTimeline([
+          ["15:42", "P-1 关注事件"],
+          ["15:46", "泵驱动端越线"],
+          ["15:51", "证据关联完成"],
+          ["待处理", "专家复核"],
+        ]),
+      ]),
+    ]);
+  }
+
+  function evidenceLine(label, value, status) {
+    return h("div", { class: "evidence-line " + status }, [
+      h("span", { text: label }),
+      h("strong", { text: value }),
+    ]);
+  }
+
+  function statusClass(status) {
+    if (status === "异常") return "active";
+    if (status === "待复核" || status === "关注") return "watch";
+    return "normal";
   }
 
   function renderDiagnosisScene() {
@@ -720,6 +822,17 @@
     stage.querySelectorAll("[data-point]").forEach(function (button) {
       button.addEventListener("click", function () {
         state.selectedPoint = button.dataset.point;
+        saveState();
+        render();
+      });
+    });
+
+    stage.querySelectorAll("[data-part]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var part = DATA.equipmentParts.find(function (item) { return item.id === button.dataset.part; });
+        if (!part) return;
+        state.selectedPart = part.id;
+        state.selectedPoint = part.pointId;
         saveState();
         render();
       });
