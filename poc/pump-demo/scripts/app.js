@@ -196,13 +196,14 @@
   }
 
   function pageShell(title, kicker, action, content) {
+    var headAction = action === false ? null : (action || statusStack());
     return h("section", { class: "scene-shell" }, [
       h("div", { class: "scene-head" }, [
         h("div", {}, [
           h("p", { class: "kicker", text: kicker }),
           h("h2", { text: title }),
         ]),
-        action || statusStack(),
+        headAction,
       ]),
       content,
       renderFlowStrip(),
@@ -223,14 +224,12 @@
 
   function renderEventScene() {
     return pageShell(
-      "P-1 泵机组部位级诊断大屏",
-      "长岭站 / 单设备多部位异常定位",
-      h("button", { class: "primary-action", type: "button", dataset: { action: "go-diagnosis" }, text: "进入诊断证据" }),
-      h("div", { class: "ops-dashboard" }, [
-        renderPumpFleetPanel(),
+      "P-1 输油泵机组部位态势",
+      "点击泵体部位进入诊断详情",
+      false,
+      h("div", { class: "ops-dashboard pump-home" }, [
         renderUnitDiagnosticPanel(),
-        renderAiDecisionPanel(),
-        renderMetricCommandStrip(),
+        renderHomeAlertPanel(),
       ])
     );
   }
@@ -263,7 +262,7 @@
         h("div", {}, [
           h("span", { class: "badge risk", text: DATA.event.grade }),
           h("h3", { text: "P-1 输油泵机组" }),
-          h("p", { text: "电机 - 联轴器 - 泵体 - 基础多部位关联诊断" }),
+          h("p", { text: "泵体、联轴器、电机、轴承、密封、底座部位入口" }),
         ]),
         h("div", { class: "event-code" }, [
           h("span", { text: "事件编号" }),
@@ -274,6 +273,9 @@
         h("div", { class: "machine-schematic", role: "img", "aria-label": "P-1 输油泵机组部位示意图" }, [
           h("div", { class: "schematic-line shaft-line" }),
           h("div", { class: "schematic-line base-line" }),
+          h("div", { class: "pump-outline pump-volute" }),
+          h("div", { class: "pump-outline pump-nozzle" }),
+          h("div", { class: "motor-ribs" }),
           h("div", { class: "pipe-line inlet" }),
           h("div", { class: "pipe-line outlet" }),
           h("div", { class: "flow-arrow", text: "FLOW" }),
@@ -282,26 +284,44 @@
             class: "schematic-part part-" + part.id + " " + part.status + (activePart.id === part.id ? " selected" : ""),
             type: "button",
             "aria-pressed": activePart.id === part.id ? "true" : "false",
-            dataset: { part: part.id },
+            dataset: { part: part.id, openDetail: "true" },
             title: part.label + " / " + part.verdict,
           }, [
-            h("span", { text: part.label }),
-            h("em", { text: part.metric }),
+            h("span", { text: part.shortLabel || part.label }),
           ]);
         }))),
       ]),
-      h("div", { class: "part-status-grid" }, DATA.equipmentParts.map(function (part) {
+      h("div", { class: "home-part-strip" }, DATA.equipmentParts.map(function (part) {
         return h("button", {
-          class: "part-status " + part.status + (activePart.id === part.id ? " selected" : ""),
+          class: "part-chip " + part.status + (activePart.id === part.id ? " selected" : ""),
           type: "button",
           "aria-pressed": activePart.id === part.id ? "true" : "false",
-          dataset: { part: part.id },
-        }, [
-          h("span", { text: part.label }),
-          h("strong", { text: part.metric }),
-          h("em", { text: part.verdict }),
-        ]);
+          dataset: { part: part.id, openDetail: "true" },
+          text: part.label,
+        });
       })),
+    ]);
+  }
+
+  function renderHomeAlertPanel() {
+    var part = selectedPart();
+    var point = DATA.measurementPoints.find(function (item) { return item.id === part.pointId; }) || selectedPoint();
+    return h("section", { class: "home-alert panel" }, [
+      panelTitle("当前告警", DATA.event.grade),
+      h("div", { class: "home-alert-main" }, [
+        h("span", { class: "result-code", text: DATA.event.id }),
+        h("strong", { text: "异常部位 3 个 / 关注部位 1 个" }),
+        h("p", { text: "点击中间泵体部位，进入对应诊断证据页。" }),
+      ]),
+      h("div", { class: "home-selected-part" }, [
+        h("span", { text: "选中部位" }),
+        h("strong", { text: part.label }),
+        h("p", { text: (part.observationLabel || point.name) + " / " + (part.detailSummary || part.verdict) }),
+      ]),
+      h("div", { class: "home-evidence-tags" }, DATA.diagnosis.evidenceTags.map(function (tag) {
+        return h("span", { class: "evidence-tag static", text: tag });
+      })),
+      h("button", { class: "primary-action home-detail-action", type: "button", dataset: { action: "open-part-detail" }, text: "查看部位详情" }),
     ]);
   }
 
@@ -374,27 +394,86 @@
   }
 
   function renderDiagnosisScene() {
+    var part = selectedPart();
     return pageShell(
-      "专业诊断与证据链",
-      "趋势、频谱、相位共同支撑疑似不对中",
+      part.label + "诊断详情",
+      "由首页泵体部位进入，趋势、频谱、相位共同支撑判断",
       h("button", { class: "primary-action", type: "button", dataset: { action: "go-knowledge" }, text: "提交专家复核" }),
       h("div", { class: "diagnosis-grid" }, [
         h("section", { class: "trend-panel panel" }, [
-          panelTitle("振动趋势与阈值", DATA.trend.title),
-          renderTrendChart(),
-          h("div", { class: "chart-legend" }, [
-            legendItem("趋势值", "solid"),
-            legendItem("80%预警线 5.68 mm/s", "warn"),
-            legendItem("停机值 7.10 mm/s", "danger"),
-          ]),
+          renderPartDetailHeader(),
+          panelTitle("部位趋势", part.trend.title),
+          renderTrendChart(part.trend),
+          renderTrendLegend(part.trend),
         ]),
         h("section", { class: "evidence-side" }, [
-          renderSpectrumCard(),
-          renderPhaseCard(),
-          renderDiagnosisCard(),
+          renderSelectedPartCard(),
+          renderPartEvidencePanel(),
+          renderPartConclusionCard(),
         ]),
       ])
     );
+  }
+
+  function renderPartDetailHeader() {
+    var part = selectedPart();
+    var point = DATA.measurementPoints.find(function (item) { return item.id === part.pointId; }) || selectedPoint();
+    return h("div", { class: "part-detail-head" }, [
+      h("div", {}, [
+        h("span", { class: "badge risk", text: part.status === "normal" ? "正常部位" : "重点部位" }),
+        h("h3", { text: part.label }),
+        h("p", { text: part.detailSummary || part.verdict }),
+      ]),
+      h("div", { class: "part-detail-metric" }, [
+        h("span", { text: part.observationLabel || point.name }),
+        h("strong", { text: part.metric }),
+      ]),
+    ]);
+  }
+
+  function renderSelectedPartCard() {
+    var part = selectedPart();
+    return h("section", { class: "panel selected-part-card" }, [
+      panelTitle("部位诊断摘要", part.status === "active" ? "abnormal" : part.status),
+      h("div", { class: "selected-part-body" }, [
+        h("strong", { text: part.label }),
+        h("p", { text: part.detailSummary || part.verdict }),
+      ]),
+      h("div", { class: "part-action-box" }, [
+        h("strong", { text: "建议动作" }),
+        h("p", { text: part.action || DATA.diagnosis.actions.join(" / ") }),
+      ]),
+    ]);
+  }
+
+  function renderPartEvidencePanel() {
+    var part = selectedPart();
+    return h("section", { class: "panel part-evidence-panel" }, [
+      panelTitle("部位证据", part.pointId),
+      h("div", { class: "part-evidence-list" }, (part.evidence || []).map(function (item) {
+        return h("div", { class: "part-evidence-row" }, [
+          h("span", { text: item.label }),
+          h("strong", { text: item.value }),
+        ]);
+      })),
+    ]);
+  }
+
+  function renderPartConclusionCard() {
+    var part = selectedPart();
+    var result = part.status === "normal" ? "未见异常证据" : DATA.diagnosis.result;
+    var code = part.status === "normal" ? "OBSERVED_NORMAL" : "MISALIGNMENT";
+    return h("section", { class: "panel diagnosis-card" }, [
+      panelTitle("部位结论", part.status === "normal" ? "normal" : DATA.diagnosis.severity),
+      h("div", { class: "diagnosis-result" }, [
+        h("span", { class: "result-code", text: code }),
+        h("strong", { text: result }),
+        h("p", { text: part.detailSummary || part.verdict }),
+      ]),
+      h("div", { class: "tag-row" }, (part.evidence || []).map(function (item) {
+        return h("button", { class: "evidence-tag", type: "button", dataset: { evidence: item.label }, text: item.label });
+      })),
+    ]);
   }
 
   function renderKnowledgeScene() {
@@ -577,37 +656,52 @@
     }));
   }
 
-  function renderTrendChart() {
+  function renderTrendChart(trend) {
     var width = 760;
     var height = 330;
     var pad = { l: 54, r: 28, t: 26, b: 48 };
-    var ys = DATA.trend.points.map(function (p) { return p.y; }).concat([DATA.thresholds.stopValue]);
-    var max = Math.max.apply(null, ys) + 0.4;
+    var thresholdValues = [trend.warningValue, trend.stopValue].filter(function (value) { return typeof value === "number"; });
+    var ys = trend.points.map(function (p) { return p.y; }).concat(thresholdValues);
+    var max = Math.max.apply(null, ys.concat([1])) + Math.max(0.4, Math.max.apply(null, ys.concat([1])) * 0.08);
     var min = 0;
     function x(i) {
-      return pad.l + (i / (DATA.trend.points.length - 1)) * (width - pad.l - pad.r);
+      return pad.l + (i / (trend.points.length - 1)) * (width - pad.l - pad.r);
     }
     function y(v) {
       return height - pad.b - ((v - min) / (max - min)) * (height - pad.t - pad.b);
     }
-    var path = DATA.trend.points.map(function (p, i) {
+    var path = trend.points.map(function (p, i) {
       return (i === 0 ? "M" : "L") + x(i).toFixed(1) + " " + y(p.y).toFixed(1);
     }).join(" ");
-    var pointNodes = DATA.trend.points.map(function (p, i) {
-      return '<g><circle class="trend-point ' + (p.y >= DATA.thresholds.warningValue ? "warn" : "") + '" cx="' + x(i) + '" cy="' + y(p.y) + '" r="5"></circle><text class="axis-label" x="' + x(i) + '" y="' + (height - 18) + '" text-anchor="middle">' + p.t + '</text><text class="point-label" x="' + x(i) + '" y="' + (y(p.y) - 12) + '" text-anchor="middle">' + p.y.toFixed(2) + '</text></g>';
+    var pointNodes = trend.points.map(function (p, i) {
+      var warn = typeof trend.warningValue === "number" && p.y >= trend.warningValue;
+      return '<g><circle class="trend-point ' + (warn ? "warn" : "") + '" cx="' + x(i) + '" cy="' + y(p.y) + '" r="5"></circle><text class="axis-label" x="' + x(i) + '" y="' + (height - 18) + '" text-anchor="middle">' + p.t + '</text><text class="point-label" x="' + x(i) + '" y="' + (y(p.y) - 12) + '" text-anchor="middle">' + p.y.toFixed(2) + '</text></g>';
     }).join("");
+    var thresholds = [];
+    if (typeof trend.warningValue === "number") {
+      thresholds.push(thresholdLine(y(trend.warningValue), width, pad, "关注线 " + trend.warningValue, "warn"));
+    }
+    if (typeof trend.stopValue === "number") {
+      thresholds.push(thresholdLine(y(trend.stopValue), width, pad, "高限 " + trend.stopValue, "danger"));
+    }
     var svg = [
       '<svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="振动趋势图">',
       '<line class="axis" x1="' + pad.l + '" y1="' + (height - pad.b) + '" x2="' + (width - pad.r) + '" y2="' + (height - pad.b) + '"></line>',
       '<line class="axis" x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (height - pad.b) + '"></line>',
-      thresholdLine(y(DATA.thresholds.warningValue), width, pad, "80%预警线 5.68", "warn"),
-      thresholdLine(y(DATA.thresholds.stopValue), width, pad, "停机值 7.10", "danger"),
+      thresholds.join(""),
       '<path class="trend-line" d="' + path + '"></path>',
       pointNodes,
-      '<text class="unit-label" x="16" y="24">' + DATA.trend.unit + '</text>',
+      '<text class="unit-label" x="16" y="24">' + trend.unit + '</text>',
       '</svg>',
     ].join("");
     return h("div", { class: "trend-chart", html: svg });
+  }
+
+  function renderTrendLegend(trend) {
+    var items = [legendItem("趋势值", "solid")];
+    if (typeof trend.warningValue === "number") items.push(legendItem("关注线 " + trend.warningValue + " " + trend.unit, "warn"));
+    if (typeof trend.stopValue === "number") items.push(legendItem("高限 " + trend.stopValue + " " + trend.unit, "danger"));
+    return h("div", { class: "chart-legend" }, items);
   }
 
   function thresholdLine(y, width, pad, label, tone) {
@@ -785,6 +879,7 @@
         var action = button.dataset.action;
         if (button.disabled) return;
         if (action === "go-diagnosis") setScene("diagnosis");
+        if (action === "open-part-detail") setScene("diagnosis");
         if (action === "go-knowledge") setScene("knowledge");
         if (action === "confirm-expert") {
           state.expertConfirmed = true;
@@ -821,7 +916,13 @@
 
     stage.querySelectorAll("[data-point]").forEach(function (button) {
       button.addEventListener("click", function () {
-        state.selectedPoint = button.dataset.point;
+        var part = DATA.equipmentParts.find(function (item) { return item.pointId === button.dataset.point; });
+        if (part) {
+          state.selectedPart = part.id;
+          state.selectedPoint = part.pointId;
+        } else {
+          state.selectedPoint = button.dataset.point;
+        }
         saveState();
         render();
       });
@@ -833,8 +934,12 @@
         if (!part) return;
         state.selectedPart = part.id;
         state.selectedPoint = part.pointId;
-        saveState();
-        render();
+        if (button.dataset.openDetail === "true") {
+          setScene("diagnosis");
+        } else {
+          saveState();
+          render();
+        }
       });
     });
 

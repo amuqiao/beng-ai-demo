@@ -23,6 +23,13 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+.app {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -181,6 +188,7 @@ p {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
   min-height: 0;
+  min-width: 0;
 }
 
 .rail {
@@ -190,6 +198,8 @@ p {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .rail-title {
@@ -202,6 +212,8 @@ p {
 .scene-nav {
   display: grid;
   gap: 8px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .scene-button {
@@ -298,6 +310,7 @@ p {
   margin: 0 auto;
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .scene-head {
@@ -597,11 +610,18 @@ p {
   grid-template-columns: 260px minmax(520px, 1fr) 360px;
   grid-template-rows: minmax(520px, 1fr) auto;
   gap: 16px;
+  min-width: 0;
+}
+
+.ops-dashboard.pump-home {
+  grid-template-columns: minmax(760px, 1fr) 320px;
+  grid-template-rows: minmax(640px, 1fr);
 }
 
 .pump-fleet,
 .unit-diagnostic,
 .ai-decision,
+.home-alert,
 .metric-command {
   background: rgba(18, 28, 37, 0.92);
 }
@@ -682,7 +702,8 @@ p {
 
 .unit-diagnostic {
   display: grid;
-  grid-template-rows: auto minmax(330px, 1fr) auto;
+  grid-template-rows: auto minmax(430px, 1fr) auto;
+  min-width: 0;
 }
 
 .unit-title {
@@ -731,21 +752,23 @@ p {
 .machine-board {
   position: relative;
   margin: 16px;
-  min-height: 360px;
+  min-height: 430px;
   border: 1px solid rgba(130, 165, 190, 0.32);
   border-radius: 8px;
   overflow: hidden;
   background: #0b1117;
+  min-width: 0;
 }
 
 .machine-schematic {
   position: relative;
-  min-height: 360px;
+  min-height: 430px;
   padding: 36px 28px 28px;
   background:
     linear-gradient(rgba(74, 163, 199, 0.1) 1px, transparent 1px),
     linear-gradient(90deg, rgba(74, 163, 199, 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
+  min-width: 0;
 }
 
 .schematic-line,
@@ -756,49 +779,88 @@ p {
 
 .shaft-line {
   left: 16%;
-  right: 11%;
-  top: 48%;
+  right: 10%;
+  top: 50%;
   height: 4px;
   background: rgba(216, 244, 255, 0.82);
   box-shadow: 0 0 14px rgba(74, 163, 199, 0.36);
 }
 
 .base-line {
-  left: 12%;
-  right: 10%;
-  bottom: 19%;
+  left: 10%;
+  right: 8%;
+  bottom: 17%;
   height: 12px;
   border-radius: 999px;
   background: rgba(130, 165, 190, 0.28);
 }
 
 .pipe-line {
-  width: 86px;
-  height: 30px;
+  width: 118px;
+  height: 38px;
   border: 3px solid rgba(74, 163, 199, 0.54);
   border-left: 0;
   border-bottom: 0;
 }
 
 .pipe-line.inlet {
-  right: 13%;
-  top: 23%;
+  left: 3%;
+  top: 33%;
   transform: rotate(180deg);
 }
 
 .pipe-line.outlet {
-  right: 6%;
-  top: 35%;
+  left: 18%;
+  top: 23%;
 }
 
 .flow-arrow {
   position: absolute;
-  right: 7%;
-  top: 17%;
+  left: 5%;
+  top: 22%;
   color: var(--green);
   font-family: Bahnschrift, "DIN Alternate", monospace;
   font-size: 12px;
   font-weight: 800;
+}
+
+.pump-outline {
+  position: absolute;
+  pointer-events: none;
+}
+
+.pump-volute {
+  left: 12%;
+  top: 33%;
+  width: 24%;
+  height: 31%;
+  border: 2px solid rgba(74, 163, 199, 0.42);
+  border-radius: 48% 42% 46% 50%;
+  background: radial-gradient(circle at 44% 52%, rgba(74, 163, 199, 0.2) 0 18%, rgba(47, 196, 159, 0.12) 19% 42%, transparent 43%);
+}
+
+.pump-nozzle {
+  left: 27%;
+  top: 24%;
+  width: 8%;
+  height: 16%;
+  border: 2px solid rgba(74, 163, 199, 0.38);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+}
+
+.motor-ribs {
+  position: absolute;
+  right: 9%;
+  top: 31%;
+  width: 25%;
+  height: 32%;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(216, 244, 255, 0.16) 19px 21px),
+    linear-gradient(135deg, rgba(47, 196, 159, 0.18), rgba(74, 163, 199, 0.08));
+  border-radius: 10px 28px 28px 10px;
+  border: 1px solid rgba(47, 196, 159, 0.32);
 }
 
 .schematic-part {
@@ -807,10 +869,11 @@ p {
   border-radius: 8px;
   background: rgba(21, 36, 47, 0.94);
   color: var(--ink);
-  padding: 10px;
+  padding: 10px 12px;
   text-align: left;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  overflow: hidden;
 }
 
 .schematic-part:hover {
@@ -824,7 +887,8 @@ p {
 
 .schematic-part span {
   font-weight: 800;
-  font-size: 13px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .schematic-part em {
@@ -836,45 +900,153 @@ p {
 }
 
 .part-motor {
-  left: 7%;
+  left: 61%;
   top: 31%;
-  width: 24%;
-  height: 33%;
+  width: 28%;
+  height: 32%;
+  background: rgba(38, 105, 85, 0.72);
 }
 
 .part-coupling {
-  left: 34%;
-  top: 38%;
-  width: 15%;
-  height: 20%;
+  left: 49%;
+  top: 42%;
+  width: 10%;
+  height: 17%;
+  background: rgba(138, 39, 35, 0.86);
 }
 
 .part-front-bearing {
-  left: 52%;
-  top: 28%;
-  width: 19%;
-  height: 24%;
+  left: 35%;
+  top: 37%;
+  width: 13%;
+  height: 21%;
 }
 
 .part-pump-body {
-  left: 64%;
-  top: 38%;
-  width: 23%;
-  height: 28%;
+  left: 13%;
+  top: 39%;
+  width: 22%;
+  height: 25%;
+  border-radius: 16px 8px 8px 16px;
 }
 
 .part-seal {
-  left: 79%;
+  left: 29%;
   top: 25%;
   width: 15%;
   height: 18%;
 }
 
 .part-base {
-  left: 34%;
+  left: 16%;
   bottom: 8%;
-  width: 37%;
+  width: 70%;
   height: 18%;
+}
+
+.home-part-strip {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-alert {
+  align-self: start;
+}
+
+.home-alert-main,
+.home-selected-part,
+.home-evidence-tags,
+.home-detail-action {
+  margin: 14px;
+}
+
+.home-alert-main {
+  border: 1px solid rgba(255, 93, 87, 0.48);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 93, 87, 0.1);
+  display: grid;
+  gap: 8px;
+}
+
+.home-alert-main .result-code {
+  color: #ffbab6;
+  font-family: Bahnschrift, "DIN Alternate", monospace;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.home-alert-main strong {
+  font-size: 20px;
+}
+
+.home-alert-main p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.home-selected-part {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-2);
+}
+
+.home-selected-part span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.home-selected-part strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+.home-selected-part p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.home-evidence-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-detail-action {
+  width: calc(100% - 28px);
+  justify-content: center;
+}
+
+.part-chip {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 9px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.part-chip.active,
+.part-chip.selected {
+  border-color: rgba(255, 93, 87, 0.58);
+  color: #ffe5e3;
+}
+
+.part-chip.watch {
+  border-color: rgba(240, 184, 74, 0.48);
+  color: #fff1c7;
+}
+
+.part-chip.normal {
+  border-color: rgba(47, 196, 159, 0.38);
 }
 
 .schematic-part.active,
@@ -1094,6 +1266,104 @@ p {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(360px, 0.95fr);
   gap: 16px;
+}
+
+.part-detail-head {
+  margin: 14px 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface-2);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.part-detail-head h3 {
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.part-detail-head p {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.part-detail-metric {
+  min-width: 220px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.part-detail-metric span,
+.part-detail-metric strong {
+  display: block;
+}
+
+.part-detail-metric span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.part-detail-metric strong {
+  margin-top: 6px;
+}
+
+.selected-part-body,
+.part-evidence-list,
+.part-action-box {
+  margin: 14px;
+}
+
+.selected-part-body {
+  display: grid;
+  gap: 8px;
+}
+
+.selected-part-body strong {
+  font-size: 22px;
+}
+
+.selected-part-body p,
+.part-action-box p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.part-evidence-list {
+  display: grid;
+  gap: 8px;
+}
+
+.part-evidence-row {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.part-evidence-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.part-action-box {
+  border-left: 3px solid var(--green);
+  padding: 10px 12px;
+  background: rgba(47, 196, 159, 0.1);
+}
+
+.part-action-box p {
+  margin-top: 6px;
 }
 
 .trend-panel,
@@ -1672,6 +1942,7 @@ figcaption {
   .rail {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    overflow: hidden;
   }
 
   .scene-nav {
@@ -1695,8 +1966,16 @@ figcaption {
     grid-template-rows: auto;
   }
 
+  .ops-dashboard.pump-home {
+    grid-template-columns: 1fr;
+  }
+
   .unit-diagnostic {
     order: 1;
+  }
+
+  .home-alert {
+    order: 2;
   }
 
   .ai-decision {
@@ -1755,6 +2034,8 @@ figcaption {
 
   .stage {
     padding: 14px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .unit-title,
@@ -1775,6 +2056,7 @@ figcaption {
     display: flex;
     overflow-x: auto;
     padding-bottom: 4px;
+    width: 100%;
   }
 
   .scene-button {
@@ -1790,32 +2072,46 @@ figcaption {
     padding: 7px;
   }
 
+  .schematic-part span {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
   .schematic-part em {
     display: none;
   }
 
   .part-motor {
-    left: 6%;
-    width: 24%;
+    left: 61%;
+    width: 28%;
   }
 
   .part-coupling {
-    left: 33%;
-    width: 16%;
+    left: 49%;
+    width: 10%;
   }
 
   .part-front-bearing {
-    left: 51%;
-    width: 20%;
+    left: 35%;
+    width: 13%;
   }
 
   .part-pump-body {
-    left: 64%;
-    width: 24%;
+    left: 13%;
+    width: 22%;
   }
 
   .flow-strip {
     position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .part-detail-head {
+    flex-direction: column;
+  }
+
+  .part-detail-metric {
+    min-width: 0;
+    width: 100%;
   }
 }
