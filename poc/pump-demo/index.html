@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>输油泵智能运维助手 · 演示原型</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header class="command-bar">
+        <div class="identity">
+          <div class="identity-mark" aria-hidden="true">P</div>
+          <div>
+            <h1>输油泵智能运维助手</h1>
+            <p id="subtitle">长岭站 P-1 疑似不对中诊断处置闭环</p>
+          </div>
+        </div>
+        <div class="command-meta">
+          <span id="clock">2026-07-22 16:31</span>
+          <span id="nodeBadge" class="node-badge">warning</span>
+          <button type="button" class="plain-button" data-action="reset">重置演示</button>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <aside class="rail" aria-label="演示节点">
+          <div class="rail-title">闭环节点</div>
+          <nav id="sceneNav" class="scene-nav"></nav>
+          <div class="rail-note">
+            <strong>演示边界</strong>
+            <p>结构化演示数据驱动；不接真实系统、不训练真实模型、不替代专家。</p>
+          </div>
+        </aside>
+
+        <main class="stage" id="stage" tabindex="-1"></main>
+      </div>
+    </div>
+
+    <script src="scripts/data.js"></script>
+    <script src="scripts/app.js"></script>
+  </body>
+</html>
