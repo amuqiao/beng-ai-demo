@@ -1,6 +1,12 @@
-.DS_Store
-*.log
-node_modules/
-__pycache__/
-*.pyc
 .env
+.venv/
+.data/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.coverage
+htmlcov/
+storage/
+.run/
+logs/
+.DS_Store
