@@ -24,6 +24,7 @@ html,
 body {
   margin: 0;
   min-width: 320px;
+  height: 100%;
   min-height: 100%;
   overflow-x: hidden;
   background:
@@ -60,12 +61,14 @@ img {
 
 .app-shell {
   width: min(1680px, 100%);
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 720px;
   margin: 0 auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: hidden;
 }
 
 .panel {
@@ -76,8 +79,8 @@ img {
 }
 
 .topbar {
-  min-height: 84px;
-  padding: 12px 14px;
+  min-height: 72px;
+  padding: 10px 14px;
   display: grid;
   grid-template-columns: minmax(260px, 360px) minmax(420px, 1fr) minmax(280px, 380px);
   gap: 16px;
@@ -92,8 +95,8 @@ img {
 }
 
 .brand-mark {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
   border: 2px solid var(--cyan);
   display: grid;
@@ -127,7 +130,7 @@ img {
 }
 
 .scene-button {
-  min-height: 58px;
+  min-height: 50px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
@@ -186,6 +189,9 @@ img {
 }
 
 .stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   outline: none;
 }
 
@@ -293,6 +299,326 @@ img {
   grid-template-columns: 300px minmax(520px, 1fr) 360px;
   gap: 14px;
   min-width: 0;
+}
+
+.overview-shell {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
+}
+
+.overview-head {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) auto auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.overview-head h2 {
+  margin-top: 4px;
+  font-size: clamp(28px, 3.1vw, 46px);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.overview-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.overview-kpis div {
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 7px 10px;
+  display: grid;
+  gap: 2px;
+}
+
+.overview-kpis span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.overview-kpis strong {
+  color: #f5fbff;
+  font-family: Bahnschrift, "DIN Alternate", sans-serif;
+  font-size: 22px;
+}
+
+.overview-screen {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(210px, 250px);
+  gap: 14px;
+}
+
+.home-summary-panel,
+.home-event-panel,
+.home-train-panel {
+  min-height: 0;
+  padding: 14px;
+}
+
+.home-summary-panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.home-task-title {
+  display: grid;
+  gap: 6px;
+}
+
+.home-task-title strong {
+  font-size: 25px;
+  line-height: 1;
+}
+
+.home-task-title span {
+  justify-self: start;
+  min-height: 26px;
+  border: 1px solid rgba(255, 98, 92, 0.45);
+  border-radius: 6px;
+  background: rgba(255, 98, 92, 0.14);
+  color: #ffe3e0;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.home-task-rows {
+  display: grid;
+  gap: 5px;
+}
+
+.home-task-rows div {
+  min-height: 30px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.home-task-rows b {
+  color: var(--ink);
+  text-align: right;
+}
+
+.home-unit-strip {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-content: start;
+}
+
+.home-unit {
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--ink);
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 8px;
+  text-align: left;
+}
+
+.home-unit.active {
+  border-color: var(--cyan);
+  background: rgba(75, 179, 211, 0.15);
+}
+
+.home-unit.readonly {
+  opacity: 0.58;
+}
+
+.home-unit span,
+.home-unit-compare span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.home-unit-compare {
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.028);
+  padding: 8px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.home-unit-compare strong {
+  color: #d8e8ef;
+  font-size: 13px;
+}
+
+.home-train-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.home-train-title {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.home-train-title div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.home-train-title span {
+  color: #dff5fb;
+  font-weight: 800;
+}
+
+.home-train-title strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.home-train-panel .pump-train {
+  height: 100%;
+  min-height: 0;
+}
+
+.home-train-panel .motor-shape {
+  right: 8%;
+  top: 32%;
+  width: 30%;
+  height: 34%;
+}
+
+.home-train-panel .pump-shape {
+  left: 14%;
+  top: 34%;
+  width: 36%;
+  height: 36%;
+}
+
+.home-train-panel .coupling-shape {
+  right: 40%;
+  top: 45%;
+  width: 11%;
+  height: 17%;
+}
+
+.home-event-panel {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.home-event-status {
+  display: grid;
+  gap: 8px;
+}
+
+.home-event-status strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.home-event-status small {
+  color: var(--muted);
+}
+
+.home-event-line {
+  color: #c4d4de;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.home-evidence-chips {
+  display: flex;
+  align-content: start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-evidence-chips span {
+  min-height: 30px;
+  border: 1px solid rgba(255, 98, 92, 0.36);
+  border-radius: 7px;
+  background: rgba(255, 98, 92, 0.1);
+  color: #ffe0df;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.home-actions {
+  display: grid;
+}
+
+.home-flow {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.home-flow-step {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-areas:
+    "idx title"
+    "idx sub";
+  align-items: center;
+  gap: 0 8px;
+}
+
+.home-flow-step.active {
+  border-color: rgba(75, 179, 211, 0.6);
+  background: rgba(75, 179, 211, 0.12);
+}
+
+.home-flow-step span {
+  grid-area: idx;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  display: grid;
+  place-items: center;
+  color: #dff8ff;
+  font-family: Bahnschrift, "DIN Alternate", sans-serif;
+}
+
+.home-flow-step strong {
+  grid-area: title;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.home-flow-step small {
+  grid-area: sub;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .panel-title {
@@ -473,6 +799,11 @@ img {
   min-height: 590px;
   display: grid;
   grid-template-rows: auto minmax(420px, 1fr) auto;
+}
+
+.train-panel.home-train-panel {
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .pump-train {
@@ -1284,6 +1615,16 @@ img {
 }
 
 @media (max-width: 1180px) {
+  .app-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .stage {
+    overflow: visible;
+  }
+
   .topbar {
     grid-template-columns: 1fr;
   }
@@ -1301,8 +1642,30 @@ img {
     grid-template-columns: 1fr;
   }
 
+  .overview-shell {
+    height: auto;
+    overflow: visible;
+  }
+
+  .overview-head {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .overview-screen {
+    grid-template-columns: 1fr;
+  }
+
+  .home-train-panel .pump-train {
+    min-height: 480px;
+  }
+
   .train-panel {
     min-height: 520px;
+  }
+
+  .train-panel.home-train-panel {
+    min-height: 0;
   }
 }
 
@@ -1314,6 +1677,7 @@ img {
   .scene-nav,
   .assist-row,
   .signal-row,
+  .overview-kpis,
   .detail-grid,
   .vision-gallery,
   .compare-images,
@@ -1322,7 +1686,23 @@ img {
     grid-template-columns: 1fr;
   }
 
+  .scene-nav {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .scene-button {
+    min-width: 148px;
+  }
+
   .flow-strip {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .home-flow {
     display: flex;
     overflow-x: auto;
     padding-bottom: 4px;
@@ -1330,6 +1710,10 @@ img {
 
   .flow-step {
     min-width: 142px;
+  }
+
+  .home-flow-step {
+    min-width: 148px;
   }
 
   .scene-head {
@@ -1346,6 +1730,10 @@ img {
 
   .pump-train {
     min-height: 360px;
+  }
+
+  .home-train-panel .pump-train {
+    min-height: 380px;
   }
 
   .part-pin {

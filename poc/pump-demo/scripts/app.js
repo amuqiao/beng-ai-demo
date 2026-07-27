@@ -137,7 +137,14 @@
     if (sceneKey !== "workbench") state.detail = "";
     saveState();
     render();
+    resetScroll();
     stage.focus();
+  }
+
+  function resetScroll() {
+    stage.scrollTop = 0;
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    window.scrollTo(0, 0);
   }
 
   function resetState() {
@@ -231,65 +238,92 @@
 
   function renderOverview() {
     var part = selectedPart();
-    return pageShell(
-      "任务总览 / 轴系部位",
-      "P-1 输油泵机组部位态势大屏",
-      h("button", { type: "button", class: "primary-action", dataset: { action: "go-workbench" }, text: "进入诊断工作台" }),
-      h("div", { class: "overview-grid" }, [
-        h("section", { class: "panel task-panel" }, [
-          panelTitle("本轮诊断对象", DATA.task.batch),
-          h("h3", { text: DATA.task.title }),
-          h("p", { class: "muted", text: DATA.task.note }),
-          h("div", { class: "task-rows" }, DATA.task.rows.map(function (row) {
-            return h("div", {}, [h("span", { text: row[0] }), h("strong", { text: row[1] })]);
+    return h("section", { class: "scene-shell overview-shell" }, [
+      h("div", { class: "overview-head" }, [
+        h("div", {}, [
+          h("p", { class: "kicker", text: "任务总览 / 轴系部位" }),
+          h("h2", { text: "P-1 输油泵机组部位态势大屏" }),
+        ]),
+        h("div", { class: "overview-kpis" }, DATA.task.metrics.slice(0, 3).map(function (metric) {
+          return h("div", {}, [
+            h("span", { text: metric.label }),
+            h("strong", { text: metric.value + metric.unit }),
+          ]);
+        })),
+        h("button", { type: "button", class: "primary-action", dataset: { action: "go-workbench" }, text: "进入诊断工作台" }),
+      ]),
+      h("div", { class: "overview-screen" }, [
+        h("aside", { class: "panel home-summary-panel" }, [
+          panelTitle("本轮任务", DATA.task.batch),
+          h("div", { class: "home-task-title" }, [
+            h("strong", { text: "长岭站 P-1" }),
+            h("span", { text: "关注级 · 疑似不对中" }),
+          ]),
+          h("div", { class: "home-task-rows" }, DATA.task.rows.slice(0, 3).map(function (row) {
+            return h("div", {}, [h("span", { text: row[0] }), h("b", { text: row[1] })]);
           })),
-          h("div", { class: "metric-grid" }, DATA.task.metrics.map(function (metric) {
-            return h("div", { class: "metric-card" }, [
-              h("span", { text: metric.label }),
-              h("strong", { text: metric.value }),
-              h("small", { text: metric.unit }),
-            ]);
-          })),
-          h("div", { class: "unit-list" }, DATA.pumpUnits.map(function (unit) {
-            return h("button", {
+          h("div", { class: "home-unit-strip" }, [
+            h("button", {
               type: "button",
-              disabled: unit.id !== "P-1",
-              class: "unit-card " + (unit.id === state.selectedUnit ? "active " : "") + unitClass(unit.status) + (unit.id !== "P-1" ? " readonly" : ""),
-              dataset: unit.id === "P-1" ? { unit: unit.id } : {},
+              class: "home-unit active danger",
+              dataset: { unit: "P-1" },
             }, [
-              h("strong", { text: unit.name }),
-              h("span", { text: unit.id === "P-1" ? unit.status : "对比样本" }),
-              h("small", { text: "负荷 " + unit.load + " · 振动 " + unit.vibration + " · 温度 " + unit.temp }),
-            ]);
-          })),
+              h("strong", { text: "P-1" }),
+              h("span", { text: "异常 · 5.82 mm/s" }),
+            ]),
+            h("div", { class: "home-unit-compare" }, [
+              h("span", { text: "对比样本" }),
+              h("strong", { text: "P-2 / P-3 / P-4" }),
+            ]),
+          ]),
         ]),
-        h("section", { class: "panel train-panel" }, [
-          panelTitle("P-1 机组部位总览", "pump train"),
+        h("section", { class: "panel train-panel home-train-panel" }, [
+          h("div", { class: "home-train-title" }, [
+            h("div", {}, [
+              h("span", { text: "P-1 机组部位总览" }),
+              h("strong", { text: "泵体 / 联轴器 / 轴承 / 电机 / 底座" }),
+            ]),
+            h("div", { class: "train-legend" }, [
+              legend("danger", "异常"),
+              legend("warn", "关注"),
+              legend("ok", "对照"),
+            ]),
+          ]),
           renderPumpTrain(part.id),
-          h("div", { class: "train-legend" }, [
-            legend("danger", "异常部位"),
-            legend("warn", "关注部位"),
-            legend("ok", "对照部位"),
-          ]),
         ]),
-        h("aside", { class: "panel event-panel" }, [
-          panelTitle("当前事件", "AI event"),
-          h("div", { class: "event-code" }, [
-            h("strong", { text: "EVT-CL-P1-ALIGN-0722" }),
+        h("aside", { class: "panel home-event-panel" }, [
+          panelTitle("当前事件", "EVT-CL-P1-ALIGN-0722"),
+          h("div", { class: "home-event-status" }, [
             h("span", { class: "badge " + part.status, text: part.badge }),
+            h("strong", { text: part.label }),
+            h("small", { text: part.component }),
           ]),
-          h("h3", { text: part.label + " · " + part.component }),
-          h("p", { class: "event-summary", text: part.summary }),
-          h("div", { class: "evidence-list" }, part.evidence.map(function (item) {
-            return h("div", {}, [h("span", { class: "dot " + part.status }), h("span", { text: item })]);
+          h("p", { class: "home-event-line", text: part.id === "coupling" ? "相位差与 2X 成分并发，建议进入工作台联判。" : part.summary }),
+          h("div", { class: "home-evidence-chips" }, part.evidence.slice(0, 2).map(function (item) {
+            return h("span", { text: item });
           })),
-          h("div", { class: "right-actions" }, [
+          h("div", { class: "home-actions" }, [
             h("button", { type: "button", class: "primary-action", dataset: { action: "go-workbench" }, text: "查看模型证据" }),
-            h("button", { type: "button", class: "plain-button", dataset: { action: "open-agent-detail" }, text: "询问 Agent" }),
           ]),
         ]),
-      ])
-    );
+      ]),
+    ]);
+  }
+
+  function renderHomeFlow() {
+    return h("div", { class: "home-flow", "aria-label": "首页演示流程" }, [
+      ["任务总览", "当前"],
+      ["诊断工作台", "模型证据"],
+      ["专家复核", "知识规范"],
+      ["处置闭环", "票卡复测"],
+      ["报告归档", "案例复用"],
+    ].map(function (step, index) {
+      return h("div", { class: "home-flow-step " + (index === 0 ? "active" : "") }, [
+        h("span", { text: String(index + 1).padStart(2, "0") }),
+        h("strong", { text: step[0] }),
+        h("small", { text: step[1] }),
+      ]);
+    }));
   }
 
   function renderPumpTrain(activeId) {
