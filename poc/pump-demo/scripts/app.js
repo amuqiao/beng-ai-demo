@@ -844,6 +844,7 @@
             h("div", { class: "tag-cloud" }, archiveTags().map(function (tag) {
               return h("span", { text: tag });
             })),
+            maintenance && state.archived ? renderArchivedCaseContext() : null,
           ]),
         ]),
         renderReuseCard(),
@@ -911,9 +912,23 @@
   }
 
   function reuseText(canReuse) {
-    if (canReuse) return DATA.reuse.agent;
+    if (canReuse) return DATA.caseKnowledge.secondPass.summary;
     if (state.archived && isNonMaintenanceVerdict(state.expertVerdict)) return "本轮为非维修闭环，仅归档观察/误报记录，不触发 P-2 维修案例命中。";
     return "完成 P-1 维修处置案例归档后，P-2 相似异常命中才会解锁。";
+  }
+
+  function renderArchivedCaseContext() {
+    var archived = DATA.caseKnowledge.archivedCase;
+    return h("div", { class: "archive-case-context" }, [
+      h("strong", { text: archived.label }),
+      h("p", { text: archived.summary }),
+      h("div", { class: "archive-source-list" }, archived.sources.slice(0, 4).map(function (source) {
+        return h("span", { text: source.text });
+      })),
+      h("div", { class: "archive-fact-list" }, archived.facts.slice(0, 4).map(function (fact) {
+        return h("small", { text: fact });
+      })),
+    ]);
   }
 
   function renderAgentDrawer() {
@@ -960,6 +975,12 @@
         h("div", { class: "agent-sources" }, knowledge.sources.map(function (source) {
           return h("span", { class: "agent-source " + source.kind, text: source.text });
         })),
+        knowledge.facts && knowledge.facts.length ? h("div", { class: "agent-facts" }, [
+          h("strong", { text: knowledge.caseId ? "增强上下文" : "诊断事实" }),
+          knowledge.facts.slice(0, 8).map(function (fact) {
+            return h("span", { text: fact });
+          }),
+        ]) : null,
         h("div", { class: "agent-questions" }, knowledge.questions.map(function (item) {
           return h("button", {
             type: "button",
@@ -982,27 +1003,15 @@
 
   function agentDrawerKnowledge(part) {
     if (state.agentContext === "case" && canUseCaseAgentContextForState(state)) {
-      return {
-        mode: "已归档案例命中",
-        caseId: DATA.reuse.matchedCase,
-        summary: DATA.reuse.agent,
-        sources: [
-          { kind: "case", text: DATA.reuse.matchedCase },
-          { kind: "rule", text: "2X频谱 / 相位差 / 基础振动" },
-          { kind: "workcard", text: "输油泵对中作业模板卡" },
-          { kind: "report", text: "P-1 维修报告归档" },
-        ],
-        questions: [
-          { key: "case-match", q: "P-2 为什么命中 P-1 案例？", a: "P-2 与已归档 P-1 案例共享 2X 频谱突出、相位差异常和基础振动偏大三类标签，因此 Agent 将 P-1 不对中处置报告作为首要参考案例。" },
-          { key: "case-action", q: "复用案例后优先做什么？", a: "优先调取输油泵对中作业模板卡，复核联轴器两侧相位、泵驱动端轴承振动和底座地脚状态，再决定是否进入停机窗口处置。" },
-          { key: "case-limit", q: "历史案例能直接替代专家吗？", a: "不能。历史案例只缩短证据解释和作业卡选择时间，最终仍要由专家结合现场负荷、检修窗口和复测数据确认结论。" },
-        ],
-      };
+      var secondPass = caseKnowledgeBlock(DATA.caseKnowledge.secondPass, DATA.caseKnowledge.caseId, DATA.caseKnowledge.title);
+      secondPass.facts = DATA.caseKnowledge.secondPass.facts.concat(DATA.caseKnowledge.archivedCase.facts.slice(0, 3));
+      return secondPass;
     }
     if (state.agentContext === "record" && canUseRecordAgentContextForState(state)) {
       var observe = state.expertVerdict === "继续观察";
       var recordId = archiveCaseId();
       return {
+        context: "record",
         mode: observe ? "观察记录已归档" : "误报反馈已归档",
         caseId: recordId,
         summary: archiveStatusText(),
@@ -1018,7 +1027,11 @@
         ],
       };
     }
+    if (part.id === DATA.caseKnowledge.partId) {
+      return caseKnowledgeBlock(DATA.caseKnowledge.firstPass, "", DATA.caseKnowledge.title);
+    }
     return {
+      context: "current",
       mode: part.short + "诊断中",
       summary: part.agent,
       sources: DATA.knowledgeHits.map(function (hit) {
@@ -1031,6 +1044,31 @@
         { key: "verdict", q: "不同专家结论如何闭环？", a: agentVerdictText() },
       ],
     };
+  }
+
+  function caseKnowledgeBlock(block, caseId, title) {
+    return {
+      context: caseId ? "case" : "current",
+      mode: block.label,
+      caseId: caseId,
+      caseTitle: title || "",
+      summary: block.summary,
+      sources: block.sources.map(function (source) {
+        return { kind: agentSourceKind(source.type), text: source.text };
+      }),
+      questions: block.questions.map(function (item, index) {
+        return { key: item.key || (caseId ? "case" : "first") + "-" + index, q: item.q, a: item.a };
+      }),
+      facts: block.facts || [],
+    };
+  }
+
+  function agentSourceKind(type) {
+    if (type === "current") return "current";
+    if (type === "standard") return "rule";
+    if (type === "archive") return "report";
+    if (type === "case") return "case";
+    return "workcard";
   }
 
   function agentDrawerTitle() {
@@ -1063,7 +1101,8 @@
   function agentAnswerText(knowledge) {
     var match = knowledge.questions.find(function (item) { return item.key === state.agentQuestion; });
     if (match) return match.a;
-    if (knowledge.caseId) return "已命中 " + knowledge.caseId + "。请选择问题查看历史案例如何增强本次异常处置建议。";
+    if (knowledge.context === "case") return "已命中 " + knowledge.caseId + "。请选择问题查看历史案例如何增强本次异常处置建议。";
+    if (knowledge.context === "record") return "已打开 " + knowledge.caseId + "。请选择问题查看该归档记录如何解释本轮非维修闭环。";
     return "请选择问题查看 Agent 对当前部位、模型证据和闭环路径的解释。";
   }
 
