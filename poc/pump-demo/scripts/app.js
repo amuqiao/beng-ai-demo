@@ -13,6 +13,7 @@
     warn: "关注",
     danger: "异常",
   };
+  var allowedVerdicts = ["确认不对中", "继续观察", "排除误报"];
   var SVG_NS = "http://www.w3.org/2000/svg";
   var svgTags = ["svg", "line", "polyline", "circle", "g", "text"];
 
@@ -32,6 +33,7 @@
       detail: "",
       expertVerdict: "",
       treatmentDone: false,
+      observationDone: false,
       archived: false,
     };
   }
@@ -67,9 +69,18 @@
     }
     if (["trend", "vision", "agent", ""].indexOf(clean.detail) < 0) clean.detail = "";
     clean.expertVerdict = typeof clean.expertVerdict === "string" ? clean.expertVerdict : "";
+    if (clean.expertVerdict !== "" && allowedVerdicts.indexOf(clean.expertVerdict) < 0) {
+      clean.expertVerdict = "";
+    }
     clean.treatmentDone = clean.treatmentDone === true && clean.expertVerdict === "确认不对中";
-    clean.archived = clean.archived === true && clean.treatmentDone;
+    clean.observationDone = clean.observationDone === true && isNonMaintenanceVerdict(clean.expertVerdict);
+    clean.archived = clean.archived === true && (clean.treatmentDone || clean.observationDone);
+    if (!canOpenForState(clean.scene, clean)) clean.scene = clean.expertVerdict ? "confirm" : "overview";
     return clean;
+  }
+
+  function isNonMaintenanceVerdict(verdict) {
+    return verdict === "继续观察" || verdict === "排除误报";
   }
 
   function h(tag, attrs, children) {
@@ -124,10 +135,14 @@
   }
 
   function canOpen(sceneKey) {
+    return canOpenForState(sceneKey, state);
+  }
+
+  function canOpenForState(sceneKey, target) {
     if (sceneKey === "overview" || sceneKey === "workbench") return true;
     if (sceneKey === "confirm") return true;
-    if (sceneKey === "treatment") return state.expertVerdict === "确认不对中" || state.treatmentDone || state.archived;
-    if (sceneKey === "archive") return state.treatmentDone || state.archived;
+    if (sceneKey === "treatment") return target.expertVerdict !== "" || target.treatmentDone || target.observationDone || target.archived;
+    if (sceneKey === "archive") return target.treatmentDone || target.observationDone || target.archived;
     return false;
   }
 
@@ -165,10 +180,12 @@
   }
 
   function currentStatusLine() {
-    if (state.archived) return "P-1 案例已归档，P-2 二次相似命中已解锁。";
+    if (state.archived && state.expertVerdict === "确认不对中") return "P-1 维修案例已归档，P-2 二次相似命中已解锁。";
+    if (state.archived) return "非维修结论已归档为观察/模型反馈记录，不触发二次维修案例命中。";
     if (state.treatmentDone) return "处置票卡和复测证据已确认，可生成归档报告。";
+    if (state.observationDone) return "非维修结论已形成闭环记录，可归档为观察/模型反馈样本。";
     if (state.expertVerdict === "确认不对中") return "专家已确认疑似不对中，待执行处置票卡和复测确认。";
-    if (state.expertVerdict) return "专家已选择非闭环结论，当前不生成维修案例归档。";
+    if (state.expertVerdict) return "专家已选择非维修结论，待生成观察记录或误报反馈。";
     if (state.scene === "confirm") return "已进入专家复核，请选择诊断结论和处置路径。";
     if (state.scene === "workbench") return "工作台已加载时序、视觉、规则和 Agent 证据。";
     return "本轮 P-1 关注级异常已加载，请从部位态势进入诊断工作台。";
@@ -220,7 +237,7 @@
     return h("div", { class: "status-stack" }, [
       statusPill("工作台", true),
       statusPill("专家确认", state.expertVerdict !== ""),
-      statusPill("处置复测", state.treatmentDone),
+      statusPill(isNonMaintenanceVerdict(state.expertVerdict) ? "结论闭环" : "处置复测", state.treatmentDone || state.observationDone),
       statusPill("案例归档", state.archived),
     ]);
   }
@@ -307,16 +324,18 @@
           ]),
         ]),
       ]),
+      renderHomeFlow(),
     ]);
   }
 
   function renderHomeFlow() {
     return h("div", { class: "home-flow", "aria-label": "首页演示流程" }, [
-      ["任务总览", "当前"],
-      ["诊断工作台", "模型证据"],
-      ["专家复核", "知识规范"],
-      ["处置闭环", "票卡复测"],
-      ["报告归档", "案例复用"],
+      ["大屏", "部位态势"],
+      ["工作台", "证据矩阵"],
+      ["时序", "模型详情"],
+      ["视觉/数据", "模型详情"],
+      ["Agent", "辅助问答"],
+      ["归档", "二次命中"],
     ].map(function (step, index) {
       return h("div", { class: "home-flow-step " + (index === 0 ? "active" : "") }, [
         h("span", { text: String(index + 1).padStart(2, "0") }),
@@ -368,9 +387,9 @@
           renderDiagnosisMatrix(part),
           renderConclusionPanel(part),
         ]),
+        state.detail ? renderDetailPanel(part) : null,
         renderSignalCards(part),
         renderAssistRow(part),
-        state.detail ? renderDetailPanel(part) : null,
       ])
     );
   }
@@ -464,10 +483,10 @@
         h("button", { type: "button", class: "plain-button", dataset: { action: "open-trend-detail" }, text: "查看时序详情" }),
       ]),
       h("section", { class: "panel assist-card" }, [
-        panelTitle("视觉模型预警", "vision model"),
+        panelTitle("视觉/数据模型详情", "vision & data model"),
         h("img", { class: "thumb", src: mediaSrc(part.vision.src), alt: part.vision.title }),
         h("p", { text: part.vision.finding }),
-        h("button", { type: "button", class: "plain-button", dataset: { action: "open-vision-detail" }, text: "查看视觉详情" }),
+        h("button", { type: "button", class: "plain-button", dataset: { action: "open-vision-detail" }, text: "查看视觉/数据详情" }),
       ]),
       h("section", { class: "panel assist-card" }, [
         panelTitle("Agent 辅助问答", "agent"),
@@ -504,7 +523,7 @@
   }
 
   function renderDetailPanel(part) {
-    var title = state.detail === "trend" ? "时序详情" : state.detail === "vision" ? "视觉详情" : "Agent 辅助问答";
+    var title = state.detail === "trend" ? "时序模型详情" : state.detail === "vision" ? "视觉/数据模型详情" : "Agent 辅助问答";
     return h("section", { class: "panel detail-panel", id: "evidenceDetail" }, [
       h("div", { class: "detail-head" }, [
         h("div", {}, [h("p", { class: "kicker", text: "工作台内展开" }), h("h3", { text: title + " · " + part.label })]),
@@ -579,8 +598,14 @@
     var part = selectedPart();
     return pageShell(
       "专家复核 / 知识规范",
-      "专家确认与处置票卡",
-      h("button", { type: "button", class: "primary-action", disabled: state.expertVerdict !== "确认不对中", dataset: { action: "go-treatment" }, text: "生成处置票卡" }),
+      isNonMaintenanceVerdict(state.expertVerdict) ? "专家确认与结论闭环" : "专家确认与处置票卡",
+      h("button", {
+        type: "button",
+        class: "primary-action",
+        disabled: state.expertVerdict === "",
+        dataset: { action: "go-treatment" },
+        text: verdictActionText(),
+      }),
       h("div", { class: "confirm-grid" }, [
         h("section", { class: "panel evidence-summary" }, [
           panelTitle("核心证据", part.label),
@@ -608,13 +633,29 @@
             verdictButton("继续观察"),
             verdictButton("排除误报"),
           ]),
-          h("div", { class: "workorder-box" }, [
-            h("h4", { text: DATA.workOrder.title }),
-            h("ol", {}, DATA.workOrder.steps.map(function (step) { return h("li", { text: step }); })),
-          ]),
+          renderVerdictNextBox(),
         ]),
       ])
     );
+  }
+
+  function renderVerdictNextBox() {
+    if (state.expertVerdict === "继续观察") {
+      return h("div", { class: "workorder-box" }, [
+        h("h4", { text: "继续观察闭环" }),
+        h("ol", {}, ["生成观察记录", "设置 48h 趋势复评窗口", "归档观察记录", "不触发维修案例命中"].map(function (step) { return h("li", { text: step }); })),
+      ]);
+    }
+    if (state.expertVerdict === "排除误报") {
+      return h("div", { class: "workorder-box" }, [
+        h("h4", { text: "误报反馈闭环" }),
+        h("ol", {}, ["记录排除依据", "生成模型反馈标签", "归档误报样本", "不生成处置票卡"].map(function (step) { return h("li", { text: step }); })),
+      ]);
+    }
+    return h("div", { class: "workorder-box" }, [
+      h("h4", { text: DATA.workOrder.title }),
+      h("ol", {}, DATA.workOrder.steps.map(function (step) { return h("li", { text: step }); })),
+    ]);
   }
 
   function verdictButton(label) {
@@ -624,11 +665,25 @@
       dataset: { verdict: label },
     }, [
       h("strong", { text: label }),
-      h("span", { text: label === "确认不对中" ? "生成处置票卡并进入复测闭环" : "保留证据但不形成维修闭环" }),
+      h("span", { text: verdictHint(label) }),
     ]);
   }
 
+  function verdictActionText() {
+    if (state.expertVerdict === "确认不对中") return "生成处置票卡";
+    if (state.expertVerdict === "继续观察") return "生成观察记录";
+    if (state.expertVerdict === "排除误报") return "生成误报反馈";
+    return "请选择专家结论";
+  }
+
+  function verdictHint(label) {
+    if (label === "确认不对中") return "生成处置票卡并进入复测闭环";
+    if (label === "继续观察") return "生成观察记录，不触发维修案例命中";
+    return "生成误报反馈，沉淀为模型反馈样本";
+  }
+
   function renderTreatment() {
+    if (isNonMaintenanceVerdict(state.expertVerdict)) return renderConclusionClosure();
     return pageShell(
       "处置闭环 / 票卡复测",
       "P-1 不对中处置票卡与复测反馈",
@@ -670,16 +725,52 @@
     return h("div", {}, [h("span", { text: label }), h("strong", { text: value })]);
   }
 
-  function renderArchive() {
+  function renderConclusionClosure() {
+    var isObserve = state.expertVerdict === "继续观察";
     return pageShell(
-      "报告归档 / 案例复用",
-      DATA.report.title,
+      "结论闭环 / 非维修路径",
+      isObserve ? "P-1 继续观察记录" : "P-1 误报反馈记录",
+      h("button", { type: "button", class: "primary-action", disabled: !state.observationDone, dataset: { action: "go-archive" }, text: "进入结论归档" }),
+      h("div", { class: "closure-grid" }, [
+        h("section", { class: "panel closure-panel" }, [
+          panelTitle("专家结论", isObserve ? "observe" : "false positive"),
+          h("h3", { text: state.expertVerdict }),
+          h("p", { text: isObserve ? "保留当前证据链，设置观察窗口和复评条件，不生成维修处置票卡。" : "记录排除依据并反馈模型标签，不进入维修处置票卡。" }),
+          h("div", { class: "closure-tags" }, (isObserve ? ["48h 观察窗口", "振动趋势复评", "不触发维修案例"] : ["误报反馈", "样本回流", "不触发处置票卡"]).map(function (tag) {
+            return h("span", { text: tag });
+          })),
+        ]),
+        h("section", { class: "panel closure-panel" }, [
+          panelTitle("依据摘要", selectedPart().label),
+          h("div", { class: "evidence-list" }, selectedPart().evidence.slice(0, 3).map(function (item) {
+            return h("div", {}, [h("span", { class: "dot warn" }), h("span", { text: item })]);
+          })),
+          h("p", { class: "muted", text: isObserve ? "本轮仅形成观察记录，后续由 Agent 在复评窗口内提醒复核。" : "本轮形成误报样本，用于后续模型阈值和规则解释优化。" }),
+        ]),
+        h("aside", { class: "panel closure-panel" }, [
+          panelTitle("闭环动作", "archive ready"),
+          h("div", { class: "feedback-cards" }, [
+            feedback(isObserve ? "观察窗口" : "反馈类型", isObserve ? "48h / 趋势复评" : "模型误报样本"),
+            feedback("处置票卡", "不生成"),
+            feedback("二次命中", "不解锁维修案例"),
+          ]),
+          h("button", { type: "button", class: "primary-action", disabled: state.observationDone, dataset: { action: "confirm-observation" }, text: state.observationDone ? "闭环已确认" : "确认闭环记录" }),
+        ]),
+      ])
+    );
+  }
+
+  function renderArchive() {
+    var maintenance = state.expertVerdict === "确认不对中";
+    return pageShell(
+      maintenance ? "报告归档 / 案例复用" : "结论归档 / 模型反馈",
+      maintenance ? DATA.report.title : nonMaintenanceArchiveTitle(),
       h("button", { type: "button", class: "primary-action", disabled: state.archived, dataset: { action: "archive-report" }, text: state.archived ? "已归档" : "确认归档" }),
       h("div", { class: "archive-stack" }, [
         h("div", { class: "archive-grid" }, [
           h("section", { class: "panel report-panel" }, [
-            panelTitle("报告草稿", "six sections"),
-            DATA.report.sections.map(function (section, index) {
+            panelTitle(maintenance ? "报告草稿" : "归档记录", maintenance ? "six sections" : "light record"),
+            archiveSections().map(function (section, index) {
               return h("article", { class: "report-section" }, [
                 h("span", { text: String(index + 1).padStart(2, "0") }),
                 h("div", {}, [h("h3", { text: section[0] }), h("p", { text: section[1] })]),
@@ -689,10 +780,10 @@
           h("aside", { class: "panel archive-side" }, [
             panelTitle("归档状态", "case entry"),
             h("div", { class: "case-card " + (state.archived ? "ready" : "") }, [
-              h("strong", { text: state.archived ? DATA.reuse.matchedCase : "等待归档确认" }),
-              h("p", { text: state.archived ? "已沉淀为相似异常检索案例。" : "处置复测确认后，报告可归档进入案例库。" }),
+              h("strong", { text: state.archived ? archiveCaseId() : "等待归档确认" }),
+              h("p", { text: state.archived ? archiveStatusText() : "闭环确认后，记录可归档进入知识库。" }),
             ]),
-            h("div", { class: "tag-cloud" }, ["不对中", "2X频谱", "相位差异常", "基础振动", "激光对中", "输油泵"].map(function (tag) {
+            h("div", { class: "tag-cloud" }, archiveTags().map(function (tag) {
               return h("span", { text: tag });
             })),
           ]),
@@ -702,33 +793,87 @@
     );
   }
 
+  function nonMaintenanceArchiveTitle() {
+    return state.expertVerdict === "继续观察" ? "长岭站 P-1 输油泵观察记录归档" : "长岭站 P-1 输油泵误报反馈归档";
+  }
+
+  function archiveSections() {
+    if (state.expertVerdict === "确认不对中") return DATA.report.sections;
+    if (state.expertVerdict === "继续观察") {
+      return [
+        ["专家结论", "本轮不生成处置票卡，进入 48h 趋势观察和复评窗口。"],
+        ["保留证据", "保留相位差、2X 成分和基础振动证据，作为后续复评上下文。"],
+        ["Agent 动作", "Agent 在观察窗口内提醒复评，不触发 P-2 维修案例命中。"],
+      ];
+    }
+    return [
+      ["专家结论", "本轮排除维修处置，形成模型误报反馈记录。"],
+      ["排除依据", "专家确认当前证据不足以生成处置票卡，保留为阈值解释样本。"],
+      ["模型反馈", "样本进入规则和模型反馈池，不触发二次维修案例命中。"],
+    ];
+  }
+
+  function archiveTags() {
+    if (state.expertVerdict === "确认不对中") return ["不对中", "2X频谱", "相位差异常", "基础振动", "激光对中", "输油泵"];
+    if (state.expertVerdict === "继续观察") return ["继续观察", "48h复评", "趋势保留", "不生成票卡"];
+    return ["排除误报", "模型反馈", "阈值解释", "不生成票卡"];
+  }
+
+  function archiveCaseId() {
+    if (state.expertVerdict === "确认不对中") return DATA.reuse.matchedCase;
+    return state.expertVerdict === "继续观察" ? "OBS-CL-P1-0722" : "FP-CL-P1-0722";
+  }
+
+  function archiveStatusText() {
+    if (state.expertVerdict === "确认不对中") return "已沉淀为相似异常检索案例。";
+    if (state.expertVerdict === "继续观察") return "已归档为观察记录，不解锁维修案例复用。";
+    return "已归档为误报反馈样本，不解锁维修处置复用。";
+  }
+
   function renderReuseCard() {
-    return h("section", { class: "panel reuse-panel " + (state.archived ? "unlocked" : "locked") }, [
-      panelTitle("二次案例命中预览", state.archived ? "P-2 reused" : "locked"),
+    var canReuse = state.archived && state.expertVerdict === "确认不对中";
+    return h("section", { class: "panel reuse-panel " + (canReuse ? "unlocked" : "locked") }, [
+      panelTitle("二次 Agent 命中预览", canReuse ? "P-2 reused" : "locked"),
       h("div", { class: "reuse-grid" }, [
         h("div", {}, [
-          h("h3", { text: DATA.reuse.title }),
-          h("p", { text: state.archived ? DATA.reuse.agent : "完成 P-1 案例归档后，P-2 相似异常命中才会解锁。" }),
+          h("h3", { text: canReuse ? "二次 Agent 命中 · " + DATA.reuse.title : DATA.reuse.title }),
+          h("p", { text: reuseText(canReuse) }),
         ]),
         h("div", { class: "reuse-tags" }, DATA.reuse.reasons.map(function (reason) { return h("span", { text: reason }); })),
-        h("div", { class: "case-id", text: state.archived ? DATA.reuse.matchedCase : "未解锁" }),
+        h("div", { class: "case-id", text: canReuse ? DATA.reuse.matchedCase : "未解锁" }),
       ]),
     ]);
+  }
+
+  function reuseText(canReuse) {
+    if (canReuse) return DATA.reuse.agent;
+    if (state.archived && isNonMaintenanceVerdict(state.expertVerdict)) return "本轮为非维修闭环，仅归档观察/误报记录，不触发 P-2 维修案例命中。";
+    return "完成 P-1 维修处置案例归档后，P-2 相似异常命中才会解锁。";
   }
 
   function renderFlowStrip() {
     var unlocked = 0;
     if (state.scene === "workbench") unlocked = Math.max(unlocked, 4);
     if (state.expertVerdict) unlocked = Math.max(unlocked, 5);
-    if (state.treatmentDone) unlocked = Math.max(unlocked, 6);
+    if (state.treatmentDone || state.observationDone) unlocked = Math.max(unlocked, 6);
     if (state.scene === "archive") unlocked = Math.max(unlocked, 7);
-    if (state.archived) unlocked = DATA.flowSteps.length - 1;
-    return h("div", { class: "flow-strip", "aria-label": "演示流程" }, DATA.flowSteps.map(function (step, index) {
+    if (state.archived) unlocked = state.expertVerdict === "确认不对中" ? DATA.flowSteps.length - 1 : 7;
+    return h("div", { class: "flow-strip", "aria-label": "演示流程" }, flowStepsForVerdict().map(function (step, index) {
       return h("div", { class: "flow-step " + (index <= unlocked ? "done" : "") }, [
         h("span", { text: String(index + 1) }),
         h("strong", { text: step.label }),
       ]);
     }));
+  }
+
+  function flowStepsForVerdict() {
+    if (!isNonMaintenanceVerdict(state.expertVerdict)) return DATA.flowSteps;
+    return DATA.flowSteps.map(function (step) {
+      if (step.key === "treatment") return { key: step.key, label: "结论闭环" };
+      if (step.key === "archive") return { key: step.key, label: "结论归档" };
+      if (step.key === "reuse") return { key: step.key, label: "不触发命中" };
+      return step;
+    });
   }
 
   function miniChart(trend, size) {
@@ -784,6 +929,7 @@
       button.addEventListener("click", function () {
         state.expertVerdict = button.dataset.verdict;
         state.treatmentDone = false;
+        state.observationDone = false;
         state.archived = false;
         saveState();
         render();
@@ -802,11 +948,20 @@
     if (action === "go-archive") return setScene("archive");
     if (action === "confirm-treatment") {
       state.treatmentDone = true;
+      state.observationDone = false;
+      saveState();
+      render();
+      return;
+    }
+    if (action === "confirm-observation") {
+      state.observationDone = true;
+      state.treatmentDone = false;
       saveState();
       render();
       return;
     }
     if (action === "archive-report") {
+      if (!state.treatmentDone && !state.observationDone) return;
       state.archived = true;
       saveState();
       render();
@@ -821,10 +976,6 @@
     if (action === "close-detail") state.detail = "";
     saveState();
     render();
-    if (state.detail) {
-      var detail = document.getElementById("evidenceDetail");
-      if (detail) detail.scrollIntoView({ block: "nearest" });
-    }
   }
 
   document.querySelectorAll("[data-action='reset-demo']").forEach(function (button) {

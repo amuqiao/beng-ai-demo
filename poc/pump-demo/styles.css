@@ -24,6 +24,7 @@ html,
 body {
   margin: 0;
   min-width: 320px;
+  width: 100%;
   height: 100%;
   min-height: 100%;
   overflow-x: hidden;
@@ -60,14 +61,16 @@ img {
 }
 
 .app-shell {
-  width: min(1680px, 100%);
+  width: 100vw;
+  max-width: none;
   height: 100vh;
+  height: 100dvh;
   min-height: 720px;
-  margin: 0 auto;
-  padding: 16px;
+  margin: 0;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -80,10 +83,10 @@ img {
 
 .topbar {
   min-height: 72px;
-  padding: 10px 14px;
+  padding: 10px 16px;
   display: grid;
-  grid-template-columns: minmax(260px, 360px) minmax(420px, 1fr) minmax(280px, 380px);
-  gap: 16px;
+  grid-template-columns: minmax(270px, 390px) minmax(520px, 1fr) minmax(300px, 430px);
+  gap: 14px;
   align-items: center;
 }
 
@@ -305,7 +308,7 @@ img {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) 42px;
   gap: 12px;
   overflow: hidden;
 }
@@ -355,7 +358,7 @@ img {
 .overview-screen {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(210px, 250px);
+  grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(230px, 280px);
   gap: 14px;
 }
 
@@ -570,10 +573,10 @@ img {
 }
 
 .home-flow {
-  min-height: 56px;
+  min-height: 42px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .home-flow-step {
@@ -581,7 +584,7 @@ img {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.035);
-  padding: 8px 10px;
+  padding: 6px 9px;
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   grid-template-areas:
@@ -598,8 +601,8 @@ img {
 
 .home-flow-step span {
   grid-area: idx;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.07);
   display: grid;
@@ -611,7 +614,7 @@ img {
 .home-flow-step strong {
   grid-area: title;
   min-width: 0;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .home-flow-step small {
@@ -619,6 +622,81 @@ img {
   min-width: 0;
   color: var(--muted);
   font-size: 11px;
+}
+
+@media (max-width: 1600px) {
+  .topbar {
+    min-height: 60px;
+    grid-template-columns: minmax(210px, 260px) minmax(480px, 1fr) minmax(150px, 220px);
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .brand small,
+  #statusLine {
+    display: none;
+  }
+
+  .scene-nav {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .scene-button {
+    min-width: 112px;
+    min-height: 40px;
+    padding: 5px 8px;
+  }
+
+  .scene-index {
+    width: 26px;
+    height: 26px;
+    font-size: 12px;
+  }
+
+  .scene-label {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .scene-node {
+    display: none;
+  }
+
+  .top-status {
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .home-train-panel .pump-shape {
+    left: 13%;
+    top: 33%;
+    width: 39%;
+    height: 38%;
+  }
+
+  .home-train-panel .motor-shape {
+    right: 7%;
+    top: 31%;
+    width: 33%;
+    height: 36%;
+  }
+
+  .home-train-panel .coupling-shape {
+    right: 39%;
+    top: 45%;
+    width: 12%;
+    height: 18%;
+  }
+
+  .home-train-panel .machine-base {
+    left: 8%;
+    right: 8%;
+    bottom: 13%;
+    height: 50px;
+  }
 }
 
 .panel-title {
@@ -1428,13 +1506,42 @@ img {
   gap: 14px;
 }
 
+.closure-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.2fr) minmax(300px, 0.8fr);
+  gap: 14px;
+}
+
 .ticket-panel,
 .compare-panel,
-.feedback-panel {
+.feedback-panel,
+.closure-panel {
   padding: 14px;
   display: grid;
   align-content: start;
   gap: 12px;
+}
+
+.closure-panel p {
+  color: #b8c8d4;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.closure-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.closure-tags span {
+  min-height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d9e6ec;
+  padding: 3px 8px;
+  font-size: 12px;
 }
 
 .role-row {
@@ -1638,6 +1745,7 @@ img {
   .workbench-grid,
   .confirm-grid,
   .treatment-grid,
+  .closure-grid,
   .archive-grid {
     grid-template-columns: 1fr;
   }
