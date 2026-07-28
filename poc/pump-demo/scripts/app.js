@@ -31,6 +31,9 @@
       selectedUnit: "P-1",
       selectedPart: "coupling",
       detail: "",
+      agentOpen: false,
+      agentContext: "current",
+      agentQuestion: "",
       expertVerdict: "",
       treatmentDone: false,
       observationDone: false,
@@ -67,7 +70,14 @@
     if (!DATA.parts.some(function (part) { return part.id === clean.selectedPart; })) {
       clean.selectedPart = "coupling";
     }
-    if (["trend", "vision", "agent", ""].indexOf(clean.detail) < 0) clean.detail = "";
+    clean.agentOpen = clean.agentOpen === true;
+    clean.agentContext = ["current", "case", "record"].indexOf(clean.agentContext) >= 0 ? clean.agentContext : "current";
+    clean.agentQuestion = typeof clean.agentQuestion === "string" ? clean.agentQuestion : "";
+    if (clean.detail === "agent") {
+      clean.detail = "";
+      clean.agentOpen = true;
+    }
+    if (["trend", "vision", ""].indexOf(clean.detail) < 0) clean.detail = "";
     clean.expertVerdict = typeof clean.expertVerdict === "string" ? clean.expertVerdict : "";
     if (clean.expertVerdict !== "" && allowedVerdicts.indexOf(clean.expertVerdict) < 0) {
       clean.expertVerdict = "";
@@ -75,6 +85,9 @@
     clean.treatmentDone = clean.treatmentDone === true && clean.expertVerdict === "确认不对中";
     clean.observationDone = clean.observationDone === true && isNonMaintenanceVerdict(clean.expertVerdict);
     clean.archived = clean.archived === true && (clean.treatmentDone || clean.observationDone);
+    if (clean.agentContext === "case" && !canUseCaseAgentContextForState(clean)) clean.agentContext = "current";
+    if (clean.agentContext === "record" && !canUseRecordAgentContextForState(clean)) clean.agentContext = "current";
+    if (!clean.agentOpen) clean.agentQuestion = "";
     if (!canOpenForState(clean.scene, clean)) clean.scene = clean.expertVerdict ? "confirm" : "overview";
     return clean;
   }
@@ -146,10 +159,20 @@
     return false;
   }
 
+  function canUseCaseAgentContextForState(target) {
+    return target.archived === true && target.expertVerdict === "确认不对中";
+  }
+
+  function canUseRecordAgentContextForState(target) {
+    return target.archived === true && isNonMaintenanceVerdict(target.expertVerdict);
+  }
+
   function setScene(sceneKey) {
     if (sceneOrder.indexOf(sceneKey) < 0 || !canOpen(sceneKey)) return;
     state.scene = sceneKey;
-    if (sceneKey !== "workbench") state.detail = "";
+    state.detail = "";
+    state.agentOpen = false;
+    state.agentQuestion = "";
     saveState();
     render();
     resetScroll();
@@ -159,6 +182,8 @@
   function resetScroll() {
     stage.scrollTop = 0;
     if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
     window.scrollTo(0, 0);
   }
 
@@ -176,6 +201,7 @@
     renderNav();
     stage.innerHTML = "";
     stage.appendChild(renderScene());
+    stage.appendChild(renderAgentDrawer());
     bindStage();
   }
 
@@ -377,17 +403,17 @@
 
   function renderWorkbench() {
     var part = selectedPart();
+    if (state.detail) return renderModelDetailPage(part);
     return pageShell(
       "诊断工作台 / 模型证据",
       part.label + "证据会聚工作台",
-      h("button", { type: "button", class: "primary-action", dataset: { action: "go-confirm" }, text: "提交专家确认" }),
+      h("button", { type: "button", class: "primary-action", dataset: { action: "go-confirm" }, text: "进入专家复核" }),
       h("div", { class: "workbench-stack" }, [
         h("div", { class: "workbench-grid" }, [
           renderScopePanel(part),
           renderDiagnosisMatrix(part),
           renderConclusionPanel(part),
         ]),
-        state.detail ? renderDetailPanel(part) : null,
         renderSignalCards(part),
         renderAssistRow(part),
       ])
@@ -492,11 +518,11 @@
         panelTitle("Agent 辅助问答", "agent"),
         h("p", { text: part.agent }),
         h("div", { class: "agent-chips" }, [
-          h("span", { text: "综合时序" }),
-          h("span", { text: "调用作业卡" }),
-          h("span", { text: "生成处置建议" }),
+          h("span", { text: "当前振动证据" }),
+          h("span", { text: "对中作业卡" }),
+          h("span", { class: state.archived ? "" : "locked", text: state.archived ? "归档结果" : "归档后可用" }),
         ]),
-        h("button", { type: "button", class: "plain-button", dataset: { action: "open-agent-detail" }, text: "打开 Agent 对话" }),
+        h("button", { type: "button", class: "plain-button", dataset: { action: "open-agent-detail" }, text: "查看诊断问答" }),
       ]),
     ]);
   }
@@ -522,14 +548,61 @@
     }));
   }
 
-  function renderDetailPanel(part) {
-    var title = state.detail === "trend" ? "时序模型详情" : state.detail === "vision" ? "视觉/数据模型详情" : "Agent 辅助问答";
-    return h("section", { class: "panel detail-panel", id: "evidenceDetail" }, [
-      h("div", { class: "detail-head" }, [
-        h("div", {}, [h("p", { class: "kicker", text: "工作台内展开" }), h("h3", { text: title + " · " + part.label })]),
-        h("button", { type: "button", class: "tool-btn", dataset: { action: "close-detail" }, text: "关闭" }),
+  function renderModelDetailPage(part) {
+    var trend = state.detail === "trend";
+    var title = trend ? "时序模型详情 · " + part.label : "视觉/数据模型详情 · " + part.label;
+    return pageShell(
+      trend ? "诊断工作台 / 时序模型" : "诊断工作台 / 视觉数据",
+      title,
+      h("div", { class: "detail-actions" }, [
+        h("button", { type: "button", class: "plain-button", dataset: { action: "close-detail" }, text: "返回工作台" }),
+        h("button", { type: "button", class: "primary-action", dataset: { action: "go-confirm" }, text: "进入专家复核" }),
       ]),
-      state.detail === "trend" ? renderTrendDetail(part) : state.detail === "vision" ? renderVisionDetail(part) : renderAgentDetail(part),
+      h("div", { class: "model-detail-stack" }, [
+        renderDetailContext(part, trend),
+        h("section", { class: "panel model-detail-panel" }, [
+          panelTitle(trend ? "时序模型预警" : "视觉/数据证据", trend ? "trend model" : "vision & data model"),
+          trend ? renderTrendDetail(part) : renderVisionDetail(part),
+        ]),
+        renderDetailEvidenceRail(part),
+      ])
+    );
+  }
+
+  function renderDetailContext(part, trend) {
+    return h("div", { class: "detail-context-row" }, [
+      h("section", { class: "panel detail-context-card" }, [
+        panelTitle("当前部位", selectedUnit().id),
+        h("strong", { text: part.label }),
+        h("p", { text: part.component }),
+        h("span", { class: "badge " + part.status, text: part.badge }),
+      ]),
+      h("section", { class: "panel detail-context-card wide" }, [
+        panelTitle(trend ? "模型判断" : "现场证据", trend ? part.trend.title : part.vision.title),
+        h("strong", { text: trend ? part.trend.alert : part.vision.finding }),
+        h("p", { text: part.summary }),
+      ]),
+      h("section", { class: "panel detail-context-card" }, [
+        panelTitle("下一步", "workflow"),
+        h("strong", { text: "回到工作台联判" }),
+        h("p", { text: "详情只解释单类证据，最终结论仍由工作台汇总后进入专家复核。" }),
+      ]),
+    ]);
+  }
+
+  function renderDetailEvidenceRail(part) {
+    return h("div", { class: "detail-evidence-rail" }, [
+      h("section", { class: "panel detail-rail-card" }, [
+        panelTitle("证据标签", "features"),
+        h("div", { class: "feature-cards" }, part.evidence.map(function (item) {
+          return h("span", { text: item });
+        })),
+      ]),
+      h("section", { class: "panel detail-rail-card" }, [
+        panelTitle("Agent 建议", "assistant"),
+        h("p", { text: part.agent }),
+        h("button", { type: "button", class: "plain-button", dataset: { action: "open-agent-detail" }, text: "查看诊断问答" }),
+      ]),
     ]);
   }
 
@@ -577,21 +650,6 @@
         ]),
       ]),
     ]);
-  }
-
-  function renderAgentDetail(part) {
-    return h("div", { class: "agent-thread" }, [
-      chat("user", "P-1 为什么优先判断为不对中？"),
-      chat("agent", part.agent),
-      chat("agent", "证据链包含：" + part.evidence.join("；") + "。建议结合对中作业卡执行复核，完成后回填复测值并归档为相似案例。"),
-      h("div", { class: "agent-tools" }, DATA.knowledgeHits.map(function (hit) {
-        return h("div", {}, [h("span", { text: hit.type }), h("strong", { text: hit.title }), h("small", { text: hit.source })]);
-      })),
-    ]);
-  }
-
-  function chat(role, text) {
-    return h("div", { class: "chat " + role }, [h("span", { text: role === "user" ? "运行工程师" : "Agent" }), h("p", { text: text })]);
   }
 
   function renderConfirm() {
@@ -832,12 +890,19 @@
 
   function renderReuseCard() {
     var canReuse = state.archived && state.expertVerdict === "确认不对中";
+    var buttonText = canReuse ? "查看 P-2 命中建议" : state.archived ? "查看归档记录问答" : "查看当前 Agent 解释";
     return h("section", { class: "panel reuse-panel " + (canReuse ? "unlocked" : "locked") }, [
       panelTitle("二次 Agent 命中预览", canReuse ? "P-2 reused" : "locked"),
       h("div", { class: "reuse-grid" }, [
         h("div", {}, [
           h("h3", { text: canReuse ? "二次 Agent 命中 · " + DATA.reuse.title : DATA.reuse.title }),
           h("p", { text: reuseText(canReuse) }),
+          h("button", {
+            type: "button",
+            class: "plain-button",
+            dataset: { action: canReuse ? "open-agent-case" : state.archived ? "open-agent-record" : "open-agent-detail" },
+            text: buttonText,
+          }),
         ]),
         h("div", { class: "reuse-tags" }, DATA.reuse.reasons.map(function (reason) { return h("span", { text: reason }); })),
         h("div", { class: "case-id", text: canReuse ? DATA.reuse.matchedCase : "未解锁" }),
@@ -849,6 +914,157 @@
     if (canReuse) return DATA.reuse.agent;
     if (state.archived && isNonMaintenanceVerdict(state.expertVerdict)) return "本轮为非维修闭环，仅归档观察/误报记录，不触发 P-2 维修案例命中。";
     return "完成 P-1 维修处置案例归档后，P-2 相似异常命中才会解锁。";
+  }
+
+  function renderAgentDrawer() {
+    var part = selectedPart();
+    var canCase = canUseCaseAgentContextForState(state);
+    var canRecord = canUseRecordAgentContextForState(state);
+    var knowledge = agentDrawerKnowledge(part);
+    var archiveContext = canCase ? "case" : "record";
+    var archiveContextActive = state.agentContext === "case" || state.agentContext === "record";
+    var archiveContextLabel = canCase ? "已归档案例" : canRecord ? "已归档记录" : "归档结果";
+    return h("div", { class: "agent-layer " + (state.agentOpen ? "open" : ""), "aria-hidden": state.agentOpen ? "false" : "true" }, [
+      h("div", { class: "agent-mask", dataset: { action: "close-agent-drawer" } }),
+      h("aside", { class: "panel agent-drawer", role: "dialog", "aria-modal": "true", "aria-label": "Agent 辅助问答", tabindex: "-1" }, [
+        h("div", { class: "agent-drawer-head" }, [
+          h("div", {}, [
+            h("p", { class: "kicker", text: "Agent 辅助问答" }),
+            h("h3", { text: agentDrawerTitle() }),
+          ]),
+          h("button", { type: "button", class: "tool-btn", dataset: { action: "close-agent-drawer" }, text: "关闭" }),
+        ]),
+        h("div", { class: "agent-drawer-context" }, [
+          h("span", { class: "badge " + (knowledge.caseId ? "ok" : part.status), text: knowledge.mode }),
+          knowledge.caseId ? h("strong", { text: knowledge.caseId }) : h("strong", { text: selectedUnit().id + " · " + part.label }),
+          h("small", { text: knowledge.summary }),
+        ]),
+        h("div", { class: "agent-context-toggle", role: "group", "aria-label": "Agent 问答上下文" }, [
+          h("button", {
+            type: "button",
+            class: "context-toggle " + (state.agentContext === "current" ? "active" : ""),
+            dataset: { agentContext: "current" },
+            "aria-pressed": state.agentContext === "current" ? "true" : "false",
+            text: "当前诊断",
+          }),
+          h("button", {
+            type: "button",
+            class: "context-toggle " + (archiveContextActive ? "active" : ""),
+            dataset: { agentContext: archiveContext },
+            "aria-pressed": archiveContextActive ? "true" : "false",
+            disabled: canCase || canRecord ? null : true,
+            title: canCase ? "查看已归档案例增强问答" : canRecord ? "查看已归档观察/误报记录" : "归档后可用",
+            text: archiveContextLabel,
+          }),
+        ]),
+        h("div", { class: "agent-sources" }, knowledge.sources.map(function (source) {
+          return h("span", { class: "agent-source " + source.kind, text: source.text });
+        })),
+        h("div", { class: "agent-questions" }, knowledge.questions.map(function (item) {
+          return h("button", {
+            type: "button",
+            class: "agent-question " + (state.agentQuestion === item.key ? "active" : ""),
+            dataset: { agentQuestion: item.key },
+            text: item.q,
+          });
+        })),
+        h("div", { class: "agent-answer", "aria-live": "polite" }, [
+          h("span", { text: "Agent" }),
+          h("p", { text: agentAnswerText(knowledge) }),
+        ]),
+        h("div", { class: "agent-drawer-foot" }, [
+          h("button", { type: "button", class: "plain-button", dataset: { action: "go-confirm" }, text: "进入专家复核" }),
+          h("button", { type: "button", class: "primary-action", dataset: { action: "close-agent-drawer" }, text: state.scene === "archive" || state.detail ? "关闭问答" : "回到工作台" }),
+        ]),
+      ]),
+    ]);
+  }
+
+  function agentDrawerKnowledge(part) {
+    if (state.agentContext === "case" && canUseCaseAgentContextForState(state)) {
+      return {
+        mode: "已归档案例命中",
+        caseId: DATA.reuse.matchedCase,
+        summary: DATA.reuse.agent,
+        sources: [
+          { kind: "case", text: DATA.reuse.matchedCase },
+          { kind: "rule", text: "2X频谱 / 相位差 / 基础振动" },
+          { kind: "workcard", text: "输油泵对中作业模板卡" },
+          { kind: "report", text: "P-1 维修报告归档" },
+        ],
+        questions: [
+          { key: "case-match", q: "P-2 为什么命中 P-1 案例？", a: "P-2 与已归档 P-1 案例共享 2X 频谱突出、相位差异常和基础振动偏大三类标签，因此 Agent 将 P-1 不对中处置报告作为首要参考案例。" },
+          { key: "case-action", q: "复用案例后优先做什么？", a: "优先调取输油泵对中作业模板卡，复核联轴器两侧相位、泵驱动端轴承振动和底座地脚状态，再决定是否进入停机窗口处置。" },
+          { key: "case-limit", q: "历史案例能直接替代专家吗？", a: "不能。历史案例只缩短证据解释和作业卡选择时间，最终仍要由专家结合现场负荷、检修窗口和复测数据确认结论。" },
+        ],
+      };
+    }
+    if (state.agentContext === "record" && canUseRecordAgentContextForState(state)) {
+      var observe = state.expertVerdict === "继续观察";
+      var recordId = archiveCaseId();
+      return {
+        mode: observe ? "观察记录已归档" : "误报反馈已归档",
+        caseId: recordId,
+        summary: archiveStatusText(),
+        sources: [
+          { kind: "report", text: recordId },
+          { kind: "rule", text: observe ? "48h趋势复评窗口" : "模型阈值反馈" },
+          { kind: "workcard", text: observe ? "观察记录" : "误报反馈样本" },
+        ],
+        questions: [
+          { key: "record-why", q: "为什么不触发维修案例命中？", a: "本轮专家结论为“" + state.expertVerdict + "”，归档对象是" + (observe ? "趋势观察记录" : "误报反馈样本") + "，不是维修处置案例，因此不解锁 P-2 维修案例命中。" },
+          { key: "record-next", q: observe ? "观察窗口里重点看什么？" : "误报反馈会怎么使用？", a: observe ? "观察窗口重点复评振动趋势、相位变化和基础振动是否继续抬升，到期后由 Agent 提醒复核。" : "误报反馈会进入模型反馈池，用于解释阈值、样本标签和规则触发边界，不生成处置票卡。" },
+          { key: "record-agent", q: "后续 Agent 会如何引用？", a: "后续 Agent 可引用该归档记录解释为什么当时未进入维修路径，但不会把它作为 P-2 相似维修处置案例。" },
+        ],
+      };
+    }
+    return {
+      mode: part.short + "诊断中",
+      summary: part.agent,
+      sources: DATA.knowledgeHits.map(function (hit) {
+        return { kind: sourceKind(hit.type), text: hit.type + " · " + hit.title };
+      }),
+      questions: [
+        { key: "why", q: "为什么优先关注这个部位？", a: part.summary + " 当前证据为：" + part.evidence.join("；") + "。" },
+        { key: "points", q: "哪些测点支持这个判断？", a: "主要依据 " + part.checkItem + "，当前趋势为“" + part.trend.alert + "”，现场证据为“" + part.vision.finding + "”。" },
+        { key: "recheck", q: "现场复核应该看什么？", a: agentRecheckText(part) },
+        { key: "verdict", q: "不同专家结论如何闭环？", a: agentVerdictText() },
+      ],
+    };
+  }
+
+  function agentDrawerTitle() {
+    if (state.agentContext === "case") return "历史案例增强诊断";
+    if (state.agentContext === "record") return "归档记录问答";
+    return "当前异常智能诊断";
+  }
+
+  function sourceKind(type) {
+    if (type === "作业卡") return "workcard";
+    if (type === "专家规则") return "rule";
+    if (type === "历史案例") return "case";
+    return "report";
+  }
+
+  function agentRecheckText(part) {
+    if (part.id === "coupling") return "先复核联轴器对中状态、两侧相位和激光对中读数，同时检查地脚螺栓、底座垫片和管道约束。";
+    if (part.id === "front-bearing") return "重点复核泵驱动端轴承垂直振动、轴承座温升、润滑状态，并与联轴器相位差联判。";
+    if (part.id === "base") return "重点补拍地脚螺栓、垫片和底座接触面，确认基础振动是否放大轴系异常。";
+    return "该部位当前更像对照或排除项，复核时记录趋势、照片和人工观察结论即可。";
+  }
+
+  function agentVerdictText() {
+    if (state.expertVerdict === "确认不对中") return "选择“确认不对中”后生成处置票卡，完成激光对中复测并归档为维修案例，后续 P-2 可命中该案例。";
+    if (state.expertVerdict === "继续观察") return "选择“继续观察”后生成观察记录，归档为复评样本，不触发 P-2 维修案例命中。";
+    if (state.expertVerdict === "排除误报") return "选择“排除误报”后生成误报反馈，归档为模型反馈样本，不触发维修处置票卡。";
+    return "当前尚未选择专家结论。建议先查看时序、视觉/数据和知识规范，再在专家复核页选择确认不对中、继续观察或排除误报。";
+  }
+
+  function agentAnswerText(knowledge) {
+    var match = knowledge.questions.find(function (item) { return item.key === state.agentQuestion; });
+    if (match) return match.a;
+    if (knowledge.caseId) return "已命中 " + knowledge.caseId + "。请选择问题查看历史案例如何增强本次异常处置建议。";
+    return "请选择问题查看 Agent 对当前部位、模型证据和闭环路径的解释。";
   }
 
   function renderFlowStrip() {
@@ -921,6 +1137,7 @@
     stage.querySelectorAll("[data-part]").forEach(function (button) {
       button.addEventListener("click", function () {
         state.selectedPart = button.dataset.part;
+        state.agentQuestion = "";
         saveState();
         render();
       });
@@ -931,8 +1148,29 @@
         state.treatmentDone = false;
         state.observationDone = false;
         state.archived = false;
+        state.agentContext = "current";
+        state.agentQuestion = "";
         saveState();
         render();
+      });
+    });
+    stage.querySelectorAll("[data-agent-context]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        if (button.dataset.agentContext === "case" && !canUseCaseAgentContextForState(state)) return;
+        if (button.dataset.agentContext === "record" && !canUseRecordAgentContextForState(state)) return;
+        state.agentContext = ["case", "record"].indexOf(button.dataset.agentContext) >= 0 ? button.dataset.agentContext : "current";
+        state.agentQuestion = "";
+        saveState();
+        render();
+        focusAgentContext(state.agentContext);
+      });
+    });
+    stage.querySelectorAll("[data-agent-question]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        state.agentQuestion = button.dataset.agentQuestion;
+        saveState();
+        render();
+        focusAgentQuestion(state.agentQuestion);
       });
     });
     stage.querySelectorAll("[data-action]").forEach(function (button) {
@@ -967,16 +1205,117 @@
       render();
       return;
     }
-    if ((action === "open-trend-detail" || action === "open-vision-detail" || action === "open-agent-detail") && state.scene !== "workbench") {
+    if (action === "open-agent-detail") {
+      if (state.scene !== "archive") state.scene = "workbench";
+      state.agentOpen = true;
+      state.agentContext = "current";
+      state.agentQuestion = "";
+      saveState();
+      render();
+      focusAgentDrawer();
+      return;
+    }
+    if (action === "open-agent-case") {
+      if (!canUseCaseAgentContextForState(state)) return;
+      state.agentOpen = true;
+      state.agentContext = "case";
+      state.agentQuestion = "";
+      saveState();
+      render();
+      focusAgentDrawer();
+      return;
+    }
+    if (action === "open-agent-record") {
+      if (!canUseRecordAgentContextForState(state)) return;
+      state.agentOpen = true;
+      state.agentContext = "record";
+      state.agentQuestion = "";
+      saveState();
+      render();
+      focusAgentDrawer();
+      return;
+    }
+    if (action === "close-agent-drawer") {
+      state.agentOpen = false;
+      state.agentQuestion = "";
+      saveState();
+      render();
+      stage.focus();
+      return;
+    }
+    if ((action === "open-trend-detail" || action === "open-vision-detail") && state.scene !== "workbench") {
       state.scene = "workbench";
     }
+    var resetView = action === "open-trend-detail" || action === "open-vision-detail" || action === "close-detail";
     if (action === "open-trend-detail") state.detail = "trend";
     if (action === "open-vision-detail") state.detail = "vision";
-    if (action === "open-agent-detail") state.detail = "agent";
     if (action === "close-detail") state.detail = "";
     saveState();
     render();
+    if (resetView) {
+      resetScroll();
+      window.requestAnimationFrame(resetScroll);
+      window.setTimeout(resetScroll, 0);
+    }
   }
+
+  function focusAgentDrawer() {
+    var drawer = stage.querySelector(".agent-drawer");
+    if (drawer) drawer.focus();
+  }
+
+  function focusAgentContext(context) {
+    var button = stage.querySelector("[data-agent-context='" + context + "']");
+    if (button) button.focus();
+    else focusAgentDrawer();
+  }
+
+  function focusAgentQuestion(question) {
+    var button = stage.querySelector("[data-agent-question='" + question + "']");
+    if (button) button.focus();
+    else focusAgentDrawer();
+  }
+
+  function focusableAgentControls() {
+    var drawer = stage.querySelector(".agent-drawer");
+    if (!drawer) return [];
+    return Array.prototype.slice.call(drawer.querySelectorAll("button:not([disabled])"));
+  }
+
+  document.addEventListener("keydown", function (event) {
+    if (!state.agentOpen) return;
+    if (event.key === "Escape") {
+      state.agentOpen = false;
+      state.agentQuestion = "";
+      saveState();
+      render();
+      stage.focus();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    var controls = focusableAgentControls();
+    if (!controls.length) {
+      event.preventDefault();
+      focusAgentDrawer();
+      return;
+    }
+    var first = controls[0];
+    var last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+      return;
+    }
+    if (controls.indexOf(document.activeElement) < 0) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 
   document.querySelectorAll("[data-action='reset-demo']").forEach(function (button) {
     button.addEventListener("click", resetState);
